@@ -2,12 +2,24 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
     <div>
-        <h2 class="section-title mb-1">Macike Enterprise Dashboard</h2>
+        <h2 class="section-title mb-1">{{ app_settings.business_name }} Dashboard</h2>
         <p class="text-muted mb-0">Operational overview and critical stock insights.</p>
     </div>
     <div class="d-flex gap-2">
         <a class="btn btn-primary btn-sm" href="/sales/pos/">New Sale</a>
         <a class="btn btn-outline-primary btn-sm" href="/inventory/restock/">Restock</a>
+    </div>
+</div>
+<div class="card shadow-sm mb-3">
+    <div class="card-header"><h5 class="mb-0">Frequent</h5></div>
+    <div class="card-body">
+        <div class="d-flex flex-wrap gap-2">
+            {% for page in frequent_pages %}
+                <a class="btn btn-outline-secondary btn-sm" href="{{ page.path }}">{{ page.label }} ({{ page.count }})</a>
+            {% empty %}
+                <span class="text-muted">Your frequent links will appear here as you use the system.</span>
+            {% endfor %}
+        </div>
     </div>
 </div>
 <div class="row g-3 mb-4">
@@ -59,4 +71,120 @@
         </div>
     </div>
 </div>
+<div class="row g-3 mt-1">
+    <div class="col-lg-6">
+        <div class="card shadow-sm h-100">
+            <div class="card-header"><h5 class="mb-0">Sales Trend (Last 7 Days)</h5></div>
+            <div class="card-body">
+                <canvas id="salesTrendChart" height="120"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-3">
+        <div class="card shadow-sm h-100">
+            <div class="card-header"><h5 class="mb-0">Payment Mix</h5></div>
+            <div class="card-body">
+                <canvas id="paymentMixChart" height="120"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-3">
+        <div class="card shadow-sm h-100">
+            <div class="card-header"><h5 class="mb-0">Top Products</h5></div>
+            <div class="card-body">
+                <canvas id="topProductsChart" height="120"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+{{ sales_labels|json_script:"sales-labels" }}
+{{ sales_series|json_script:"sales-series" }}
+{{ payment_labels|json_script:"payment-labels" }}
+{{ payment_values|json_script:"payment-values" }}
+{{ top_product_labels|json_script:"top-product-labels" }}
+{{ top_product_values|json_script:"top-product-values" }}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script>
+    (function () {
+        const isDark = document.body.classList.contains("theme-dark");
+        const tickColor = isDark ? "#cbd5e1" : "#334155";
+        const gridColor = isDark ? "rgba(148,163,184,0.18)" : "rgba(51,65,85,0.12)";
+        const legendColor = isDark ? "#e5e7eb" : "#334155";
+        const salesLabels = JSON.parse(document.getElementById("sales-labels").textContent);
+        const salesSeries = JSON.parse(document.getElementById("sales-series").textContent);
+        const paymentLabels = JSON.parse(document.getElementById("payment-labels").textContent);
+        const paymentValues = JSON.parse(document.getElementById("payment-values").textContent);
+        const topProductLabels = JSON.parse(document.getElementById("top-product-labels").textContent);
+        const topProductValues = JSON.parse(document.getElementById("top-product-values").textContent);
+
+        new Chart(document.getElementById("salesTrendChart"), {
+            type: "line",
+            data: {
+                labels: salesLabels,
+                datasets: [{
+                    label: "Sales (KES)",
+                    data: salesSeries,
+                    borderColor: "#0f4c81",
+                    backgroundColor: "rgba(15, 76, 129, 0.15)",
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.3
+                }]
+            },
+            options: { responsive: true, plugins: { legend: { display: false } } }
+        });
+
+        new Chart(document.getElementById("paymentMixChart"), {
+            type: "pie",
+            data: {
+                labels: paymentLabels,
+                datasets: [{
+                    data: paymentValues,
+                    backgroundColor: ["#0f4c81", "#1f9d8b", "#f59e0b", "#ef4444"]
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        labels: { color: legendColor }
+                    }
+                }
+            }
+        });
+
+        new Chart(document.getElementById("topProductsChart"), {
+            type: "bar",
+            data: {
+                labels: topProductLabels,
+                datasets: [{
+                    label: "Qty",
+                    data: topProductValues,
+                    backgroundColor: "#1f9d8b"
+                }]
+            },
+            options: {
+                responsive: true,
+                indexAxis: "y",
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: {
+                        ticks: { color: tickColor },
+                        grid: { color: gridColor }
+                    },
+                    y: {
+                        ticks: { color: tickColor },
+                        grid: { color: gridColor }
+                    }
+                }
+            }
+        });
+
+        Chart.getChart("salesTrendChart").options.scales = {
+            x: { ticks: { color: tickColor }, grid: { color: gridColor } },
+            y: { ticks: { color: tickColor }, grid: { color: gridColor } },
+        };
+        Chart.getChart("salesTrendChart").update();
+    })();
+</script>
 {% endblock %}

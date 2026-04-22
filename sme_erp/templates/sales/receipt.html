@@ -1,37 +1,132 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="card shadow-sm">
-    <div class="card-header d-flex justify-content-between align-items-center">
-        <h5 class="mb-0">Macike Enterprise Receipt INV-{{ invoice.id }}</h5>
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h2 class="section-title mb-1">Invoice INV-{{ invoice.id }}</h2>
+        <p class="text-muted mb-0">Official sales receipt and payment entries.</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a class="btn btn-primary btn-sm" href="/sales/receipt/{{ invoice.id }}/payments/new/">Add Payment Entry</a>
         <a class="btn btn-outline-primary btn-sm" href="/sales/receipt/{{ invoice.id }}/pdf/">Download PDF</a>
     </div>
+</div>
+
+<div class="card shadow-sm mb-3">
     <div class="card-body">
-        <div class="row mb-3">
+        <div class="row">
             <div class="col-md-6">
-                <p class="mb-1"><strong>Date:</strong> {{ invoice.timestamp }}</p>
-                <p class="mb-1"><strong>Cashier:</strong> {{ invoice.cashier.username }}</p>
+                {% if app_settings.logo_url %}
+                    <img src="{{ app_settings.logo_url }}" alt="Logo" style="max-height:56px;" class="mb-2">
+                {% endif %}
+                <h5 class="mb-1">{{ app_settings.business_name }}</h5>
+                <p class="text-muted mb-1">{{ app_settings.business_address }}</p>
+                {% if app_settings.business_phone %}<p class="text-muted mb-1">Tel: {{ app_settings.business_phone }}</p>{% endif %}
+                {% if app_settings.business_email %}<p class="text-muted mb-1">{{ app_settings.business_email }}</p>{% endif %}
+                <p class="text-muted mb-1">Receipt No: INV-{{ invoice.id }}</p>
+                <p class="text-muted mb-0">Date: {{ invoice.timestamp }}</p>
             </div>
-            <div class="col-md-6">
+            <div class="col-md-6 text-md-end">
                 <p class="mb-1"><strong>Customer:</strong> {{ invoice.customer_name }}</p>
-                <p class="mb-1"><strong>Payment:</strong> {{ invoice.get_payment_method_display }}</p>
-                <p class="mb-1"><strong>Status:</strong> {{ invoice.get_status_display }}</p>
+                <p class="mb-1"><strong>Cashier:</strong> {{ invoice.cashier.username }}</p>
+                <p class="mb-1"><strong>Due Date:</strong> {{ invoice.due_date }}</p>
+                <p class="mb-0"><strong>Status:</strong> {{ invoice.get_status_display }}</p>
             </div>
         </div>
+    </div>
+</div>
+
+<div class="card shadow-sm mb-3">
+    <div class="card-header"><h5 class="mb-0">Line Items</h5></div>
+    <div class="card-body p-0">
         <table class="table table-striped">
-            <thead class="table-dark"><tr><th>Item</th><th>Qty</th><th>Price</th><th>Subtotal</th></tr></thead>
+            <thead class="table-dark"><tr><th>Item</th><th>Supplier</th><th>Qty</th><th>Unit Price</th><th>Subtotal</th></tr></thead>
             <tbody>
             {% for line in invoice.line_items.all %}
                 <tr>
                     <td>{{ line.product.name }}</td>
+                    <td>{{ line.product.supplier.company_name|default:"-" }}</td>
                     <td>{{ line.quantity }}</td>
-                    <td>{{ line.unit_price }}</td>
-                    <td>{{ line.subtotal }}</td>
+                    <td>{{ app_settings.currency_code }} {{ line.unit_price }}</td>
+                    <td>{{ app_settings.currency_code }} {{ line.subtotal }}</td>
                 </tr>
             {% endfor %}
             </tbody>
         </table>
-        <p class="mb-1"><strong>VAT:</strong> {{ invoice.tax_amount }}</p>
-        <p class="mb-0"><strong>Total:</strong> {{ invoice.total_amount }}</p>
+    </div>
+</div>
+
+<div class="row g-3">
+    <div class="col-lg-7">
+        <div class="card shadow-sm h-100">
+            <div class="card-header"><h5 class="mb-0">Payment Entries</h5></div>
+            <div class="card-body p-0">
+                <table class="table table-sm mb-0">
+                    <thead>
+                        <tr>
+                            <th>Method</th>
+                            <th>Reference</th>
+                            <th>Status</th>
+                            <th>Amount</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for entry in payment_entries %}
+                            <tr>
+                                <td>{{ entry.get_method_display }}</td>
+                                <td>{{ entry.reference|default:"-" }}</td>
+                                <td>{{ entry.get_status_display }}</td>
+                                <td>{{ app_settings.currency_code }} {{ entry.amount }}</td>
+                            </tr>
+                        {% endfor %}
+                        {% if invoice.payment_method == "MPESA" %}
+                            {% for tx in mpesa_entries %}
+                            <tr>
+                                <td>M-Pesa</td>
+                                <td>{{ tx.mpesa_code|default:tx.checkout_request_id }}</td>
+                                <td>{{ tx.get_status_display }}</td>
+                                <td>{{ app_settings.currency_code }} {{ tx.amount }}</td>
+                            </tr>
+                            {% empty %}
+                            <tr><td colspan="4" class="text-muted">No M-Pesa entry yet.</td></tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td>{{ invoice.get_payment_method_display }}</td>
+                                <td>INV-{{ invoice.id }}</td>
+                                <td>{{ invoice.get_status_display }}</td>
+                                <td>{{ app_settings.currency_code }} {{ invoice.total_amount }}</td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-5">
+        <div class="card shadow-sm h-100">
+            <div class="card-header"><h5 class="mb-0">Invoice Totals</h5></div>
+            <div class="card-body">
+                <div class="d-flex justify-content-between mb-2">
+                    <span>Subtotal</span><strong>{{ app_settings.currency_code }} {{ subtotal_amount }}</strong>
+                </div>
+                <div class="d-flex justify-content-between mb-2">
+                    <span>VAT ({{ app_settings.vat_rate }}%)</span><strong>{{ app_settings.currency_code }} {{ invoice.tax_amount }}</strong>
+                </div>
+                <hr>
+                <div class="d-flex justify-content-between">
+                    <span>Total</span><strong>{{ app_settings.currency_code }} {{ invoice.total_amount }}</strong>
+                </div>
+                <div class="d-flex justify-content-between mt-2">
+                    <span>Paid</span><strong>{{ app_settings.currency_code }} {{ total_paid }}</strong>
+                </div>
+                <div class="d-flex justify-content-between mt-2">
+                    <span>Balance</span><strong>{{ app_settings.currency_code }} {{ balance_due }}</strong>
+                </div>
+                <p class="text-muted mt-3 mb-1"><strong>Amount in Words:</strong> {{ app_settings.currency_code }} {{ amount_words }} only.</p>
+                <p class="text-muted mb-1"><strong>Terms:</strong> {{ app_settings.invoice_terms }}</p>
+                <p class="text-muted mt-3 mb-0">{{ app_settings.receipt_footer }}</p>
+            </div>
+        </div>
     </div>
 </div>
 {% endblock %}

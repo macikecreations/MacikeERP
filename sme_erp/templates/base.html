@@ -3,8 +3,9 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Macike Enterprise ERP</title>
+    <title>{{ app_settings.business_name }} ERP</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
     <style>
         :root {
             --brand-primary: #0f4c81;
@@ -12,22 +13,252 @@
             --brand-bg: #f4f7fb;
         }
         body { background: var(--brand-bg); }
+        body.theme-dark {
+            --brand-primary: #111827;
+            --brand-accent: #60a5fa;
+            --brand-bg: #0b1220;
+            color: #e5e7eb;
+        }
+        body.theme-dark,
+        body.theme-dark p,
+        body.theme-dark span,
+        body.theme-dark div,
+        body.theme-dark li,
+        body.theme-dark td,
+        body.theme-dark th,
+        body.theme-dark label {
+            color: #e5e7eb;
+        }
+        body.theme-dark h1,
+        body.theme-dark h2,
+        body.theme-dark h3,
+        body.theme-dark h4,
+        body.theme-dark h5,
+        body.theme-dark h6,
+        body.theme-dark strong {
+            color: #f8fafc;
+        }
+        body.theme-dark .card,
+        body.theme-dark .bg-white,
+        body.theme-dark .table {
+            background: #111827 !important;
+            color: #e5e7eb !important;
+        }
+        body.theme-dark .card-header {
+            background: #0f172a !important;
+            color: #f8fafc !important;
+            border-bottom-color: #2b3648 !important;
+        }
+        body.theme-dark .table-dark {
+            --bs-table-bg: #1f2937;
+        }
+        body.theme-dark .table,
+        body.theme-dark .table tbody,
+        body.theme-dark .table tr,
+        body.theme-dark .table td,
+        body.theme-dark .table th {
+            background-color: #111827 !important;
+            color: #e5e7eb !important;
+        }
+        body.theme-dark .table-striped > tbody > tr:nth-of-type(odd) > * {
+            color: #e5e7eb;
+            background-color: rgba(148, 163, 184, 0.08);
+        }
+        body.theme-dark .table-hover > tbody > tr:hover > * {
+            color: #f8fafc;
+            background-color: rgba(96, 165, 250, 0.18);
+        }
+        body.theme-dark .card {
+            border-color: #2b3648;
+            box-shadow: none;
+        }
+        body.theme-dark .card-header,
+        body.theme-dark .list-group-item,
+        body.theme-dark .table > :not(caption) > * > * {
+            border-color: #2b3648;
+        }
+        body.theme-dark .list-group,
+        body.theme-dark .list-group-item {
+            background: #111827 !important;
+            color: #e5e7eb !important;
+        }
+        body.theme-dark .list-group-item:hover {
+            background: #172036 !important;
+        }
+        body.theme-dark .form-control,
+        body.theme-dark .form-select {
+            background: #0f172a;
+            color: #e5e7eb;
+            border-color: #334155;
+        }
+        body.theme-dark .form-control::placeholder {
+            color: #94a3b8;
+        }
+        body.theme-dark .form-control:focus,
+        body.theme-dark .form-select:focus {
+            border-color: #60a5fa;
+            box-shadow: 0 0 0 0.2rem rgba(96, 165, 250, 0.22);
+        }
+        body.theme-dark .btn-outline-secondary {
+            color: #cbd5e1;
+            border-color: #64748b;
+        }
+        body.theme-dark .btn-outline-secondary:hover {
+            color: #ffffff;
+            background-color: #475569;
+            border-color: #64748b;
+        }
+        body.theme-dark .btn-outline-primary {
+            color: #93c5fd;
+            border-color: #60a5fa;
+        }
+        body.theme-dark .btn-outline-primary:hover {
+            color: #0b1220;
+            background-color: #93c5fd;
+            border-color: #93c5fd;
+        }
+        body.theme-dark .btn-primary {
+            background-color: #2563eb;
+            border-color: #2563eb;
+            color: #ffffff;
+        }
+        body.theme-dark .btn-primary:hover {
+            background-color: #1d4ed8;
+            border-color: #1d4ed8;
+        }
+        body.theme-dark .alert {
+            background-color: #0f172a;
+            border-color: #334155;
+            color: #e2e8f0;
+        }
+        body.theme-dark .badge-soft-success {
+            background: #123f2b;
+            color: #86efac;
+        }
+        body.theme-dark .badge-soft-danger {
+            background: #4a1d1f;
+            color: #fca5a5;
+        }
+        body.theme-dark a {
+            color: #93c5fd;
+        }
+        body.theme-dark a:hover {
+            color: #bfdbfe;
+        }
+        body.theme-dark .text-muted {
+            color: #9ca3af !important;
+        }
+        body.compact .card-body,
+        body.compact .list-group-item,
+        body.compact .btn,
+        body.compact .form-control,
+        body.compact .form-select {
+            padding-top: 0.35rem;
+            padding-bottom: 0.35rem;
+            font-size: 0.9rem;
+        }
         .app-shell { min-height: calc(100vh - 56px); }
-        .card { border: 0; border-radius: 0.8rem; }
-        .card-header { background: #fff; border-bottom: 1px solid #edf1f5; }
+        .app-shell .sidebar-col {
+            width: 240px;
+            transition: width 0.28s ease;
+            overflow: hidden;
+        }
+        .app-shell .content-col {
+            width: calc(100% - 240px);
+            transition: width 0.28s ease;
+        }
+        body.sidebar-collapsed .app-shell .sidebar-col {
+            width: 78px;
+        }
+        body.sidebar-collapsed .app-shell .content-col {
+            width: calc(100% - 78px);
+        }
+        .card {
+            border: 1px solid #dbe3ec;
+            border-radius: 0.8rem;
+            box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+        }
+        .card-header { background: #fff; border-bottom: 1px solid #dbe3ec; }
+        .table { border-color: #dbe3ec; }
+        .table > :not(caption) > * > * { border-bottom-color: #dbe3ec; }
+        .list-group-item { border-color: #dbe3ec; }
+        .form-control, .form-select {
+            border: 1px solid #cbd5e1;
+            box-shadow: none;
+        }
+        .form-control:focus, .form-select:focus {
+            border-color: #0f4c81;
+            box-shadow: 0 0 0 0.2rem rgba(15, 76, 129, 0.15);
+        }
         .badge-soft-danger { background: #ffe7e7; color: #b42318; }
         .badge-soft-success { background: #e8f7ee; color: #027a48; }
         .section-title { font-weight: 700; letter-spacing: 0.2px; }
-        .sidebar-link { color: #334155; text-decoration: none; padding: 0.55rem 0.75rem; border-radius: 0.5rem; display: block; }
+        .sidebar-link { color: #334155; text-decoration: none; padding: 0.6rem 0.75rem; border-radius: 0.5rem; display: flex; align-items: center; gap: 0.65rem; white-space: nowrap; }
+        .sidebar-link i { width: 1rem; text-align: center; font-size: 1rem; }
+        .sidebar-link .link-text { transition: opacity 0.2s ease; }
         .sidebar-link:hover, .sidebar-link.active { background: #e8eef7; color: #0f4c81; }
+        body.sidebar-collapsed .sidebar-link { justify-content: center; gap: 0; padding: 0.6rem; }
+        body.sidebar-collapsed .sidebar-link .link-text,
+        body.sidebar-collapsed .sidebar-caption,
+        body.sidebar-collapsed .app-subtitle.sidebar-role { opacity: 0; width: 0; overflow: hidden; }
         .top-stat { font-size: 1.45rem; font-weight: 700; }
         .app-subtitle { font-size: 0.85rem; color: #64748b; }
+        .sidebar-toggle-btn { border-color: rgba(255,255,255,.45); }
+        .sidebar-footer {
+            border-top: 1px solid #dbe3ec;
+            padding-top: 0.75rem;
+            margin-top: auto;
+        }
+        .sidebar-control-btn {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            justify-content: flex-start;
+        }
+        body.sidebar-collapsed .sidebar-control-btn {
+            justify-content: center;
+        }
+        body.sidebar-collapsed .sidebar-control-btn .link-text {
+            opacity: 0;
+            width: 0;
+            overflow: hidden;
+        }
+        body.theme-dark .sidebar-footer {
+            border-top-color: #2b3648;
+        }
+        /* Sidebar nav: keep hover/active readable in dark mode (global a:hover was winning over link color on light hover bg). */
+        body.theme-dark aside a.sidebar-link {
+            color: #e2e8f0;
+        }
+        body.theme-dark aside a.sidebar-link:hover,
+        body.theme-dark aside a.sidebar-link:focus-visible {
+            background-color: rgba(96, 165, 250, 0.2);
+            color: #f8fafc;
+        }
+        body.theme-dark aside a.sidebar-link.active {
+            background-color: rgba(96, 165, 250, 0.28);
+            color: #ffffff;
+        }
+        body.theme-dark aside .app-subtitle,
+        body.theme-dark aside .sidebar-role {
+            color: #94a3b8 !important;
+        }
+        @media (max-width: 991px) {
+            .app-shell .sidebar-col { width: 78px; }
+            .app-shell .content-col { width: calc(100% - 78px); }
+        }
     </style>
 </head>
-<body>
+<body class="{% if app_settings.theme == 'dark' %}theme-dark{% endif %}{% if app_settings.compact_mode %} compact{% endif %}">
     <nav class="navbar navbar-expand-lg navbar-dark" style="background: var(--brand-primary);">
         <div class="container-fluid">
-            <a class="navbar-brand fw-semibold" href="/">Macike Enterprise ERP</a>
+            <a class="navbar-brand fw-semibold d-flex align-items-center gap-2" href="/">
+                {% if app_settings.logo_url %}
+                    <img src="{{ app_settings.logo_url }}" alt="Business Logo" style="height: 30px; width: auto; border-radius: 4px;">
+                {% endif %}
+                <span>{{ app_settings.business_name }} ERP</span>
+            </a>
             <span class="text-white-50 small d-none d-md-inline">Retail Operations Platform</span>
             {% if user.is_authenticated %}
                 <form method="post" action="/logout/" class="d-inline">
@@ -40,18 +271,36 @@
     <main class="container-fluid app-shell">
         <div class="row g-0">
             {% if user.is_authenticated %}
-            <aside class="col-md-3 col-lg-2 p-3 border-end bg-white">
-                <p class="text-uppercase app-subtitle mb-2">Navigation</p>
-                <a class="sidebar-link" href="/">Dashboard</a>
-                <a class="sidebar-link" href="/inventory/">Inventory</a>
-                <a class="sidebar-link" href="/inventory/new/">Add Product</a>
-                <a class="sidebar-link" href="/inventory/restock/">Restock</a>
-                <a class="sidebar-link" href="/sales/pos/">POS Checkout</a>
-                <a class="sidebar-link" href="/sales/report/">Sales Reports</a>
-                <a class="sidebar-link" href="/profile/">My Profile</a>
-                <a class="sidebar-link" href="/backup/export/csv/">Backup CSV</a>
+            <aside class="sidebar-col p-3 border-end bg-white d-flex flex-column">
+                <div>
+                    <p class="text-uppercase app-subtitle mb-2 sidebar-caption">Navigation</p>
+                    <p class="app-subtitle sidebar-role mb-3">Signed in as {{ user.username }}</p>
+                </div>
+                <div class="flex-grow-1">
+                    <a class="sidebar-link" href="/" title="Dashboard"><i class="bi bi-speedometer2"></i><span class="link-text">Dashboard</span></a>
+                    <a class="sidebar-link" href="/inventory/" title="Inventory"><i class="bi bi-box-seam"></i><span class="link-text">Inventory</span></a>
+                    <a class="sidebar-link" href="/inventory/new/" title="Add Product"><i class="bi bi-plus-square"></i><span class="link-text">Add Product</span></a>
+                    <a class="sidebar-link" href="/inventory/restock/" title="Restock"><i class="bi bi-arrow-repeat"></i><span class="link-text">Restock</span></a>
+                    <a class="sidebar-link" href="/sales/pos/" title="POS Checkout"><i class="bi bi-cart-check"></i><span class="link-text">POS Checkout</span></a>
+                    <a class="sidebar-link" href="/sales/customers/" title="Customers"><i class="bi bi-people"></i><span class="link-text">Customers</span></a>
+                    <a class="sidebar-link" href="/sales/report/" title="Sales Reports"><i class="bi bi-bar-chart-line"></i><span class="link-text">Sales Reports</span></a>
+                    <a class="sidebar-link" href="/profile/" title="My Profile"><i class="bi bi-person-circle"></i><span class="link-text">My Profile</span></a>
+                    {% if user.role == "ADMIN" or user.is_superuser %}
+                    <a class="sidebar-link" href="/accounts/users/" title="User Management"><i class="bi bi-person-gear"></i><span class="link-text">User Management</span></a>
+                    {% endif %}
+                    <a class="sidebar-link" href="/settings/" title="Settings"><i class="bi bi-gear"></i><span class="link-text">Settings</span></a>
+                    <a class="sidebar-link" href="/backup/export/csv/" title="Backup CSV"><i class="bi bi-download"></i><span class="link-text">Backup CSV</span></a>
+                </div>
+                <div class="sidebar-footer d-grid gap-2">
+                    <button id="themeToggle" class="btn btn-outline-secondary btn-sm sidebar-control-btn" type="button" title="Toggle light/dark theme">
+                        <i id="themeToggleIcon" class="bi bi-moon-stars"></i><span class="link-text">Theme</span>
+                    </button>
+                    <button id="sidebarToggle" class="btn btn-outline-secondary btn-sm sidebar-control-btn" type="button" title="Toggle sidebar">
+                        <i class="bi bi-layout-sidebar-inset"></i><span class="link-text">Sidebar</span>
+                    </button>
+                </div>
             </aside>
-            <section class="col-md-9 col-lg-10 p-4">
+            <section class="content-col p-4">
             {% else %}
             <section class="col-12 p-4">
             {% endif %}
@@ -63,5 +312,37 @@
         </div>
     </main>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        (function () {
+            const sidebarKey = "macike_sidebar_collapsed";
+            const themeKey = "macike_theme_override";
+            const body = document.body;
+            const sidebarBtn = document.getElementById("sidebarToggle");
+            const themeBtn = document.getElementById("themeToggle");
+            const themeIcon = document.getElementById("themeToggleIcon");
+
+            const setThemeIcon = () => {
+                if (!themeIcon) return;
+                themeIcon.className = body.classList.contains("theme-dark") ? "bi bi-sun" : "bi bi-moon-stars";
+            };
+
+            const savedTheme = localStorage.getItem(themeKey);
+            if (savedTheme === "dark") body.classList.add("theme-dark");
+            if (savedTheme === "light") body.classList.remove("theme-dark");
+            setThemeIcon();
+
+            if (sidebarBtn && localStorage.getItem(sidebarKey) === "1") body.classList.add("sidebar-collapsed");
+            if (sidebarBtn) sidebarBtn.addEventListener("click", function () {
+                body.classList.toggle("sidebar-collapsed");
+                localStorage.setItem(sidebarKey, body.classList.contains("sidebar-collapsed") ? "1" : "0");
+            });
+
+            if (themeBtn) themeBtn.addEventListener("click", function () {
+                body.classList.toggle("theme-dark");
+                localStorage.setItem(themeKey, body.classList.contains("theme-dark") ? "dark" : "light");
+                setThemeIcon();
+            });
+        })();
+    </script>
 </body>
 </html>

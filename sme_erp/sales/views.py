@@ -14,9 +14,10 @@ from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 
 from accounts.permissions import role_required
+from dashboard.models import AppSettings
 from inventory.services import consume_fifo_stock
-from .forms import QuickSaleForm
-from .models import MpesaTransaction, SalesInvoice, SalesLineItem
+from .forms import CustomerForm, PaymentEntryForm, QuickSaleForm
+from .models import Customer, MpesaTransaction, PaymentEntry, SalesInvoice, SalesLineItem
 from .mpesa import MpesaConfigError, initiate_stk_push
 
 
@@ -33,10 +34,30 @@ def _finalize_invoice_stock(invoice: SalesInvoice) -> None:
         )
 
 
+ONES = [
+    "Zero", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten",
+    "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen",
+]
+TENS = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"]
+
+
+def _num_to_words(n: int) -> str:
+    if n < 20:
+        return ONES[n]
+    if n < 100:
+        return TENS[n // 10] + (f" {ONES[n % 10]}" if n % 10 else "")
+    if n < 1000:
+        return ONES[n // 100] + " Hundred" + (f" {_num_to_words(n % 100)}" if n % 100 else "")
+    if n < 1_000_000:
+        return _num_to_words(n // 1000) + " Thousand" + (f" {_num_to_words(n % 1000)}" if n % 1000 else "")
+    return str(n)
+
+
 @login_required
 @role_required("ADMIN", "MANAGER", "CASHIER")
 def quick_sale(request):
-    form = QuickSaleForm(request.POST or None)
+    app_settings = AppSettings.get_solo()
+    form = QuickSaleForm(request.POST or None, settings_obj=app_settings)
     if request.method == "POST" and form.is_valid():
         product = form.cleaned_data["product"]
         quantity = form.cleaned_data["quantity"]
@@ -51,11 +72,16 @@ def quick_sale(request):
         if payment_method == SalesInvoice.PaymentMethod.MPESA:
             try:
                 with transaction.atomic():
+                    customer_obj = None
+                    if customer_name and customer_name.lower() != "walk-in":
+                        customer_obj, _ = Customer.objects.get_or_create(name=customer_name)
                     invoice = SalesInvoice.objects.create(
                         cashier=request.user,
+                        customer=customer_obj,
                         customer_name=customer_name,
                         payment_method=payment_method,
                         status=SalesInvoice.Status.PENDING_PAYMENT,
+                        due_date=timezone.localdate() + timedelta(days=5),
                     )
                     subtotal = Decimal(quantity) * product.selling_price
                     SalesLineItem.objects.create(
@@ -91,15 +117,22 @@ def quick_sale(request):
                 return redirect("sales-pos")
 
             messages.success(request, f"STK pushed to {phone_number}. Complete payment, then wait for callback confirmation.")
-            return redirect("sales-receipt", invoice_id=invoice.id)
+            if app_settings.auto_open_receipt:
+                return redirect("sales-receipt", invoice_id=invoice.id)
+            return redirect("sales-pos")
         else:
             try:
                 with transaction.atomic():
+                    customer_obj = None
+                    if customer_name and customer_name.lower() != "walk-in":
+                        customer_obj, _ = Customer.objects.get_or_create(name=customer_name)
                     invoice = SalesInvoice.objects.create(
                         cashier=request.user,
+                        customer=customer_obj,
                         customer_name=customer_name,
                         payment_method=payment_method,
                         status=SalesInvoice.Status.PAID,
+                        due_date=timezone.localdate(),
                     )
                     subtotal = Decimal(quantity) * product.selling_price
                     SalesLineItem.objects.create(
@@ -117,7 +150,9 @@ def quick_sale(request):
                 return redirect("sales-pos")
 
         messages.success(request, f"Sale processed. Invoice INV-{invoice.id}.")
-        return redirect("sales-receipt", invoice_id=invoice.id)
+        if app_settings.auto_open_receipt:
+            return redirect("sales-receipt", invoice_id=invoice.id)
+        return redirect("sales-pos")
     return render(request, "sales/pos.html", {"form": form})
 
 
@@ -174,37 +209,135 @@ def mpesa_callback(request):
 @role_required("ADMIN", "MANAGER", "CASHIER", "AUDITOR")
 def receipt_view(request, invoice_id: int):
     invoice = get_object_or_404(SalesInvoice.objects.select_related("cashier"), id=invoice_id)
-    return render(request, "sales/receipt.html", {"invoice": invoice})
+    subtotal_amount = sum((line.subtotal for line in invoice.line_items.all()), Decimal("0.00"))
+    mpesa_entries = invoice.mpesa_transactions.all().order_by("-id")
+    payment_entries = invoice.payment_entries.select_related("created_by").order_by("-created_at")
+    total_paid = sum((entry.amount for entry in payment_entries), Decimal("0.00"))
+    amount_words = _num_to_words(int(invoice.total_amount))
+    return render(
+        request,
+        "sales/receipt.html",
+        {
+            "invoice": invoice,
+            "subtotal_amount": subtotal_amount,
+            "mpesa_entries": mpesa_entries,
+            "payment_entries": payment_entries,
+            "total_paid": total_paid,
+            "balance_due": invoice.total_amount - total_paid,
+            "amount_words": amount_words,
+        },
+    )
+
+
+@login_required
+@role_required("ADMIN", "MANAGER", "CASHIER")
+def add_payment_entry(request, invoice_id: int):
+    invoice = get_object_or_404(SalesInvoice, id=invoice_id)
+    form = PaymentEntryForm(request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        entry = form.save(commit=False)
+        entry.invoice = invoice
+        entry.created_by = request.user
+        entry.save()
+        messages.success(request, "Payment entry added.")
+        return redirect("sales-receipt", invoice_id=invoice.id)
+    return render(request, "sales/payment_entry_form.html", {"invoice": invoice, "form": form})
+
+
+@login_required
+@role_required("ADMIN", "MANAGER", "CASHIER", "AUDITOR")
+def customer_list(request):
+    customers = Customer.objects.all().order_by("name")
+    return render(request, "sales/customer_list.html", {"customers": customers})
+
+
+@login_required
+@role_required("ADMIN", "MANAGER", "CASHIER")
+def customer_create(request):
+    form = CustomerForm(request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        form.save()
+        messages.success(request, "Customer saved.")
+        return redirect("sales-customers")
+    return render(request, "sales/customer_form.html", {"form": form})
 
 
 @login_required
 @role_required("ADMIN", "MANAGER", "CASHIER", "AUDITOR")
 def receipt_pdf(request, invoice_id: int):
+    app_settings = AppSettings.get_solo()
     invoice = get_object_or_404(SalesInvoice.objects.select_related("cashier"), id=invoice_id)
     buffer = BytesIO()
     pdf = canvas.Canvas(buffer, pagesize=A4)
-    y = 800
-    pdf.setFont("Helvetica-Bold", 14)
-    pdf.drawString(50, y, "SME ERP Receipt")
-    y -= 30
-    pdf.setFont("Helvetica", 11)
-    pdf.drawString(50, y, f"Invoice: INV-{invoice.id}")
-    y -= 20
-    pdf.drawString(50, y, f"Date: {timezone.localtime(invoice.timestamp).strftime('%Y-%m-%d %H:%M')}")
-    y -= 20
-    pdf.drawString(50, y, f"Cashier: {invoice.cashier.username}")
-    y -= 20
-    pdf.drawString(50, y, f"Customer: {invoice.customer_name}")
-    y -= 30
-    pdf.drawString(50, y, "Items")
-    y -= 20
+    y = 810
+
+    pdf.setFont("Helvetica-Bold", 16)
+    pdf.drawString(40, y, f"{app_settings.business_name} - Sales Invoice")
+    y -= 24
+    pdf.setFont("Helvetica", 10)
+    pdf.drawString(40, y, f"Invoice No: INV-{invoice.id}")
+    pdf.drawRightString(560, y, f"Date: {timezone.localtime(invoice.timestamp).strftime('%Y-%m-%d %H:%M')}")
+    y -= 16
+    pdf.drawString(40, y, f"Customer: {invoice.customer_name}")
+    pdf.drawRightString(560, y, f"Cashier: {invoice.cashier.username}")
+    y -= 16
+    pdf.drawString(40, y, f"Payment: {invoice.get_payment_method_display()} | Status: {invoice.get_status_display()}")
+    pdf.drawRightString(560, y, f"Due Date: {invoice.due_date}")
+    y -= 22
+
+    pdf.setFont("Helvetica-Bold", 10)
+    pdf.drawString(40, y, "Item")
+    pdf.drawString(300, y, "Qty")
+    pdf.drawString(360, y, "Unit Price")
+    pdf.drawRightString(560, y, "Subtotal")
+    y -= 8
+    pdf.line(40, y, 560, y)
+    y -= 14
+
+    pdf.setFont("Helvetica", 10)
+    subtotal_amount = Decimal("0.00")
     for line in invoice.line_items.select_related("product"):
-        pdf.drawString(60, y, f"{line.product.name} x{line.quantity} @ {line.unit_price} = {line.subtotal}")
-        y -= 18
+        if y < 110:
+            pdf.showPage()
+            y = 810
+            pdf.setFont("Helvetica", 10)
+        pdf.drawString(40, y, f"{line.product.name}")
+        pdf.drawString(300, y, str(line.quantity))
+        pdf.drawString(360, y, f"{app_settings.currency_code} {line.unit_price}")
+        pdf.drawRightString(560, y, f"{app_settings.currency_code} {line.subtotal}")
+        subtotal_amount += line.subtotal
+        y -= 16
+
     y -= 10
-    pdf.drawString(50, y, f"VAT: {invoice.tax_amount}")
-    y -= 20
-    pdf.drawString(50, y, f"Total: {invoice.total_amount}")
+    pdf.line(340, y, 560, y)
+    y -= 16
+    pdf.setFont("Helvetica", 10)
+    pdf.drawString(360, y, "Subtotal:")
+    pdf.drawRightString(560, y, f"{app_settings.currency_code} {subtotal_amount}")
+    y -= 14
+    pdf.drawString(360, y, f"VAT ({app_settings.vat_rate}%):")
+    pdf.drawRightString(560, y, f"{app_settings.currency_code} {invoice.tax_amount}")
+    y -= 16
+    pdf.setFont("Helvetica-Bold", 11)
+    pdf.drawString(360, y, "Total:")
+    pdf.drawRightString(560, y, f"{app_settings.currency_code} {invoice.total_amount}")
+    y -= 22
+    total_paid = sum((entry.amount for entry in invoice.payment_entries.all()), Decimal("0.00"))
+    balance_due = invoice.total_amount - total_paid
+    pdf.setFont("Helvetica", 10)
+    pdf.drawString(360, y, "Paid:")
+    pdf.drawRightString(560, y, f"{app_settings.currency_code} {total_paid}")
+    y -= 14
+    pdf.drawString(360, y, "Balance:")
+    pdf.drawRightString(560, y, f"{app_settings.currency_code} {balance_due}")
+    y -= 16
+    pdf.drawString(40, y, f"Amount in Words: {app_settings.currency_code} {_num_to_words(int(invoice.total_amount))} only.")
+    y -= 14
+    pdf.drawString(40, y, f"Terms: {app_settings.invoice_terms}")
+    y -= 14
+    pdf.setFont("Helvetica", 9)
+    pdf.drawString(40, y, app_settings.receipt_footer)
+
     pdf.showPage()
     pdf.save()
     buffer.seek(0)
@@ -219,9 +352,21 @@ def sales_report(request):
     daily = invoices.filter(timestamp__date=now.date()).aggregate(total=models.Sum("total_amount"))["total"] or Decimal("0.00")
     weekly = invoices.filter(timestamp__gte=now - timedelta(days=7)).aggregate(total=models.Sum("total_amount"))["total"] or Decimal("0.00")
     monthly = invoices.filter(timestamp__year=now.year, timestamp__month=now.month).aggregate(total=models.Sum("total_amount"))["total"] or Decimal("0.00")
+    payment_breakdown = invoices.values("payment_method").annotate(
+        total=models.Sum("total_amount"),
+        count=models.Count("id"),
+    ).order_by("payment_method")
+    recent_mpesa_entries = MpesaTransaction.objects.select_related("invoice").order_by("-id")[:15]
     recent = invoices[:20]
     return render(
         request,
         "sales/report.html",
-        {"daily_total": daily, "weekly_total": weekly, "monthly_total": monthly, "recent_invoices": recent},
+        {
+            "daily_total": daily,
+            "weekly_total": weekly,
+            "monthly_total": monthly,
+            "recent_invoices": recent,
+            "payment_breakdown": payment_breakdown,
+            "recent_mpesa_entries": recent_mpesa_entries,
+        },
     )

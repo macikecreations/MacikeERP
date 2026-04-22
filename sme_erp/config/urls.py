@@ -17,13 +17,16 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import include, path
 
-from accounts.views import ERPLoginView, ERPLogoutView, profile_view
+from accounts.views import ERPLoginView, ERPLogoutView, profile_view, user_create_view, user_edit_view, user_list_view
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path("login/", ERPLoginView.as_view(), name="login"),
     path("logout/", ERPLogoutView.as_view(), name="logout"),
     path("profile/", profile_view, name="profile"),
+    path("accounts/users/", user_list_view, name="accounts-users"),
+    path("accounts/users/new/", user_create_view, name="accounts-user-create"),
+    path("accounts/users/<int:user_id>/edit/", user_edit_view, name="accounts-user-edit"),
     path("", include("dashboard.urls")),
     path("inventory/", include("inventory.urls")),
     path("sales/", include("sales.urls")),

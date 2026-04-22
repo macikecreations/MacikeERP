@@ -3,8 +3,24 @@ from decimal import Decimal
 from django.conf import settings
 from django.core.validators import MinValueValidator
 from django.db import models
+from django.utils import timezone
 
 from inventory.models import Product
+
+
+class Customer(models.Model):
+    name = models.CharField(max_length=120)
+    mobile = models.CharField(max_length=20, blank=True)
+    address = models.CharField(max_length=255, blank=True)
+    region = models.CharField(max_length=120, blank=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["name"]
+
+    def __str__(self) -> str:
+        return self.name
 
 
 class SalesInvoice(models.Model):
@@ -19,11 +35,13 @@ class SalesInvoice(models.Model):
         CARD = "CARD", "Card"
 
     cashier = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="invoices")
+    customer = models.ForeignKey(Customer, on_delete=models.SET_NULL, null=True, blank=True, related_name="invoices")
     customer_name = models.CharField(max_length=100, default="Walk-in")
     total_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     tax_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     payment_method = models.CharField(max_length=20, choices=PaymentMethod.choices, default=PaymentMethod.CASH)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.PAID)
+    due_date = models.DateField(default=timezone.localdate)
     timestamp = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -62,3 +80,24 @@ class MpesaTransaction(models.Model):
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
     result_desc = models.CharField(max_length=255, blank=True)
     raw_callback = models.JSONField(blank=True, null=True)
+
+
+class PaymentEntry(models.Model):
+    class Method(models.TextChoices):
+        CASH = "CASH", "Cash"
+        MPESA = "MPESA", "M-Pesa"
+        CARD = "CARD", "Card"
+        BANK = "BANK", "Bank Transfer"
+
+    class Status(models.TextChoices):
+        POSTED = "POSTED", "Posted"
+        PENDING = "PENDING", "Pending"
+
+    invoice = models.ForeignKey(SalesInvoice, on_delete=models.CASCADE, related_name="payment_entries")
+    method = models.CharField(max_length=20, choices=Method.choices)
+    amount = models.DecimalField(max_digits=12, decimal_places=2, validators=[MinValueValidator(0)])
+    reference = models.CharField(max_length=100, blank=True)
+    notes = models.CharField(max_length=255, blank=True)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.POSTED)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="payment_entries")
+    created_at = models.DateTimeField(auto_now_add=True)

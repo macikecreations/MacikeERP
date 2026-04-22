@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card shadow-sm">
+    <div class="card-header"><h5 class="mb-0">{% if mode == "edit" %}Edit User: {{ target_user.username }}{% else %}Create User{% endif %}</h5></div>
+    <div class="card-body">
+        <form method="post" class="row g-3">
+            {% csrf_token %}
+            {% for field in form %}
+                <div class="col-md-6">
+                    <label class="form-label">{{ field.label }}</label>
+                    {{ field }}
+                    {% if field.errors %}<div class="text-danger small">{{ field.errors|striptags }}</div>{% endif %}
+                </div>
+            {% endfor %}
+            <div class="col-12">
+                <button class="btn btn-primary" type="submit">{% if mode == "edit" %}Save Changes{% else %}Create User{% endif %}</button>
+                <a class="btn btn-outline-secondary" href="/accounts/users/">Back</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

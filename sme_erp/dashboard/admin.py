@@ -1,3 +1,6 @@
 from django.contrib import admin
 
-# Register your models here.
+from .models import AppSettings, UserPageVisit
+
+admin.site.register(AppSettings)
+admin.site.register(UserPageVisit)
