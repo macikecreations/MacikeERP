@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card shadow-sm">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">Point of Sale - Macike Enterprise</h5>
+        <span class="badge text-bg-primary">Fast Checkout</span>
+    </div>
+    <div class="card-body">
+        <p class="text-muted">Process customer transactions and auto-update inventory in real time.</p>
+        <form method="post" class="row g-3">
+            {% csrf_token %}
+            {% for field in form %}
+                <div class="col-md-6">
+                    <label class="form-label">{{ field.label }}{% if field.field.required %} <span class="text-danger">*</span>{% endif %}</label>
+                    {{ field }}
+                    {% if field.errors %}<div class="text-danger small">{{ field.errors|striptags }}</div>{% endif %}
+                </div>
+            {% endfor %}
+            <div class="col-12">
+                <button type="submit" class="btn btn-primary">Checkout & Generate Receipt</button>
+            </div>
+        </form>
+        <p class="text-muted mt-3 mb-0">After checkout, a receipt page opens with PDF download.</p>
+    </div>
+</div>
+{% endblock %}

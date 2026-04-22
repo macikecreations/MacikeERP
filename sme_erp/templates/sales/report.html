@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="section-title mb-1">Sales Performance Report</h2>
+        <p class="text-muted mb-0">Track daily, weekly, and monthly revenue for Macike Enterprise.</p>
+    </div>
+    <a class="btn btn-outline-primary btn-sm" href="/backup/export/csv/">Export Backup</a>
+</div>
+<div class="row g-3 mb-4">
+    <div class="col-md-4"><div class="card shadow-sm"><div class="card-body"><p class="app-subtitle mb-1">Daily Revenue</p><h4>KES {{ daily_total }}</h4></div></div></div>
+    <div class="col-md-4"><div class="card shadow-sm"><div class="card-body"><p class="app-subtitle mb-1">Weekly Revenue</p><h4>KES {{ weekly_total }}</h4></div></div></div>
+    <div class="col-md-4"><div class="card shadow-sm"><div class="card-body"><p class="app-subtitle mb-1">Monthly Revenue</p><h4>KES {{ monthly_total }}</h4></div></div></div>
+</div>
+<div class="card shadow-sm">
+    <div class="card-header"><h5 class="mb-0">Recent Invoices</h5></div>
+    <div class="table-responsive">
+        <table class="table table-striped mb-0">
+            <thead class="table-dark"><tr><th>Invoice</th><th>Date</th><th>Cashier</th><th>Status</th><th>Total</th></tr></thead>
+            <tbody>
+            {% for inv in recent_invoices %}
+                <tr>
+                    <td><a href="/sales/receipt/{{ inv.id }}/">INV-{{ inv.id }}</a></td>
+                    <td>{{ inv.timestamp }}</td>
+                    <td>{{ inv.cashier.username }}</td>
+                    <td>{{ inv.get_status_display }}</td>
+                    <td>{{ inv.total_amount }}</td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="5" class="text-center">No invoices yet.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

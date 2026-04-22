@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block content %}
+<h2 class="mb-4">My Profile</h2>
+<div class="row g-3">
+    <div class="col-md-6">
+        <div class="card shadow-sm">
+            <div class="card-header"><h5 class="mb-0">Recent Sales</h5></div>
+            <ul class="list-group list-group-flush">
+                {% for inv in recent_invoices %}
+                    <li class="list-group-item">INV-{{ inv.id }} - {{ inv.total_amount }} ({{ inv.timestamp }})</li>
+                {% empty %}
+                    <li class="list-group-item">No sales yet.</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card shadow-sm">
+            <div class="card-header"><h5 class="mb-0">My Stock Activity</h5></div>
+            <ul class="list-group list-group-flush">
+                {% for log in recent_activity %}
+                    <li class="list-group-item">{{ log.action_type }} {{ log.quantity_changed }} - {{ log.product.name }}</li>
+                {% empty %}
+                    <li class="list-group-item">No stock actions yet.</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+</div>
+{% endblock %}

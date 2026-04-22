@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="section-title mb-1">Macike Enterprise Dashboard</h2>
+        <p class="text-muted mb-0">Operational overview and critical stock insights.</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a class="btn btn-primary btn-sm" href="/sales/pos/">New Sale</a>
+        <a class="btn btn-outline-primary btn-sm" href="/inventory/restock/">Restock</a>
+    </div>
+</div>
+<div class="row g-3 mb-4">
+    <div class="col-md-4"><div class="card shadow-sm"><div class="card-body"><p class="app-subtitle mb-1">Total Products</p><div class="top-stat">{{ product_count }}</div></div></div></div>
+    <div class="col-md-4"><div class="card shadow-sm"><div class="card-body"><p class="app-subtitle mb-1">Total Invoices</p><div class="top-stat">{{ invoice_count }}</div></div></div></div>
+    <div class="col-md-4"><div class="card shadow-sm"><div class="card-body"><p class="app-subtitle mb-1">Low Stock Items</p><div class="top-stat text-danger">{{ low_stock_count }}</div></div></div></div>
+</div>
+<div class="row g-3">
+    <div class="col-lg-4">
+        <div class="card shadow-sm h-100">
+            <div class="card-header"><h5 class="mb-0">Low Stock Alerts</h5></div>
+            <ul class="list-group list-group-flush">
+                {% for item in low_stock_items %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <span>{{ item.name }}</span>
+                        <span class="badge badge-soft-danger">Qty {{ item.quantity }}</span>
+                    </li>
+                {% empty %}
+                    <li class="list-group-item">No low stock alerts.</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+    <div class="col-lg-4">
+        <div class="card shadow-sm h-100">
+            <div class="card-header"><h5 class="mb-0">Recent Sales</h5></div>
+            <ul class="list-group list-group-flush">
+                {% for inv in recent_sales %}
+                    <li class="list-group-item d-flex justify-content-between">
+                        <span>INV-{{ inv.id }} ({{ inv.cashier.username }})</span>
+                        <strong>{{ inv.total_amount }}</strong>
+                    </li>
+                {% empty %}
+                    <li class="list-group-item">No sales yet.</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+    <div class="col-lg-4">
+        <div class="card shadow-sm h-100">
+            <div class="card-header"><h5 class="mb-0">Recent Stock Activity</h5></div>
+            <ul class="list-group list-group-flush">
+                {% for log in recent_activity %}
+                    <li class="list-group-item">{{ log.action_type }} {{ log.quantity_changed }} - {{ log.product.name }}</li>
+                {% empty %}
+                    <li class="list-group-item">No activity yet.</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+</div>
+{% endblock %}

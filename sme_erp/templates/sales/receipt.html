@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card shadow-sm">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">Macike Enterprise Receipt INV-{{ invoice.id }}</h5>
+        <a class="btn btn-outline-primary btn-sm" href="/sales/receipt/{{ invoice.id }}/pdf/">Download PDF</a>
+    </div>
+    <div class="card-body">
+        <div class="row mb-3">
+            <div class="col-md-6">
+                <p class="mb-1"><strong>Date:</strong> {{ invoice.timestamp }}</p>
+                <p class="mb-1"><strong>Cashier:</strong> {{ invoice.cashier.username }}</p>
+            </div>
+            <div class="col-md-6">
+                <p class="mb-1"><strong>Customer:</strong> {{ invoice.customer_name }}</p>
+                <p class="mb-1"><strong>Payment:</strong> {{ invoice.get_payment_method_display }}</p>
+                <p class="mb-1"><strong>Status:</strong> {{ invoice.get_status_display }}</p>
+            </div>
+        </div>
+        <table class="table table-striped">
+            <thead class="table-dark"><tr><th>Item</th><th>Qty</th><th>Price</th><th>Subtotal</th></tr></thead>
+            <tbody>
+            {% for line in invoice.line_items.all %}
+                <tr>
+                    <td>{{ line.product.name }}</td>
+                    <td>{{ line.quantity }}</td>
+                    <td>{{ line.unit_price }}</td>
+                    <td>{{ line.subtotal }}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        <p class="mb-1"><strong>VAT:</strong> {{ invoice.tax_amount }}</p>
+        <p class="mb-0"><strong>Total:</strong> {{ invoice.total_amount }}</p>
+    </div>
+</div>
+{% endblock %}
