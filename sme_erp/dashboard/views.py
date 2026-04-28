@@ -1,5 +1,6 @@
 import csv
 from datetime import timedelta
+from decimal import Decimal
 
 from django.contrib.auth.decorators import login_required
 from django.db import models
@@ -50,8 +51,21 @@ def home(request):
     top_product_values = [int(row["total_qty"]) for row in top_products]
 
     low_stock_qs = Product.objects.filter(quantity__lte=models.F("reorder_level"))
-    recent_sales = SalesInvoice.objects.select_related("cashier")[:8]
-    recent_activity = StockAuditLog.objects.select_related("product", "user")[:8]
+    recent_sales = SalesInvoice.objects.select_related("cashier").order_by("-timestamp")[:5]
+    recent_activity = StockAuditLog.objects.select_related("product", "user").order_by("-timestamp")[:5]
+
+    paid_invoices = SalesInvoice.objects.filter(status=SalesInvoice.Status.PAID)
+    now = timezone.now()
+
+    def paid_sum(qs):
+        return Decimal(str(qs.aggregate(total=models.Sum("total_amount"))["total"] or 0)).quantize(Decimal("0.01"))
+
+    sales_total_today = paid_sum(paid_invoices.filter(timestamp__date=today))
+    sales_total_week = paid_sum(paid_invoices.filter(timestamp__gte=now - timedelta(days=7)))
+    sales_total_month = paid_sum(
+        paid_invoices.filter(timestamp__year=now.year, timestamp__month=now.month),
+    )
+
     context = {
         "settings_obj": AppSettings.get_solo(),
         "product_count": Product.objects.count(),
@@ -60,7 +74,10 @@ def home(request):
         "low_stock_items": low_stock_qs[:10],
         "recent_sales": recent_sales,
         "recent_activity": recent_activity,
-        "frequent_pages": UserPageVisit.objects.filter(user=request.user)[:6],
+        "sales_total_today": sales_total_today,
+        "sales_total_week": sales_total_week,
+        "sales_total_month": sales_total_month,
+        "frequent_pages": UserPageVisit.objects.filter(user=request.user).order_by("-count", "-last_visited")[:5],
         "sales_labels": day_labels,
         "sales_series": sales_series,
         "payment_labels": payment_labels,

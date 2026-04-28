@@ -7,14 +7,50 @@
     </div>
     <a class="btn btn-outline-secondary btn-sm" href="/sales/receipt/{{ invoice.id }}/">Back to Invoice</a>
 </div>
+
+<div class="card shadow-sm border-primary border-opacity-25 mb-4">
+    <div class="card-header bg-primary bg-opacity-10">
+        <strong>From this invoice</strong> <span class="text-muted small">(form below is pre-filled for a typical balance payment; adjust as needed.)</span>
+    </div>
+    <div class="card-body py-3">
+        <div class="row g-3 small">
+            <div class="col-6 col-md-4 col-lg-2">
+                <div class="text-muted text-uppercase" style="font-size: 0.7rem;">Customer</div>
+                <div class="fw-semibold">{{ invoice.customer_name }}</div>
+            </div>
+            <div class="col-6 col-md-4 col-lg-2">
+                <div class="text-muted text-uppercase" style="font-size: 0.7rem;">Invoice status</div>
+                <div class="fw-semibold">{{ invoice.get_status_display }}</div>
+            </div>
+            <div class="col-6 col-md-4 col-lg-2">
+                <div class="text-muted text-uppercase" style="font-size: 0.7rem;">Sale payment type</div>
+                <div class="fw-semibold">{{ invoice.get_payment_method_display }}</div>
+            </div>
+            <div class="col-6 col-md-4 col-lg-2">
+                <div class="text-muted text-uppercase" style="font-size: 0.7rem;">Invoice total</div>
+                <div class="fw-semibold">{{ app_settings.currency_code }} {{ invoice.total_amount|floatformat:2 }}</div>
+            </div>
+            <div class="col-6 col-md-4 col-lg-2">
+                <div class="text-muted text-uppercase" style="font-size: 0.7rem;">Posted payments</div>
+                <div class="fw-semibold">{{ app_settings.currency_code }} {{ invoice_total_paid|floatformat:2 }}</div>
+            </div>
+            <div class="col-6 col-md-4 col-lg-2">
+                <div class="text-muted text-uppercase" style="font-size: 0.7rem;">Balance due</div>
+                <div class="fw-semibold text-primary">{{ app_settings.currency_code }} {{ invoice_balance_due|floatformat:2 }}</div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="card shadow-sm">
     <div class="card-body">
         <form method="post" class="row g-3">
             {% csrf_token %}
             {% for field in form %}
                 <div class="col-md-6">
-                    <label class="form-label">{{ field.label }}</label>
+                    <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
                     {{ field }}
+                    {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
                     {% if field.errors %}<div class="text-danger small">{{ field.errors|striptags }}</div>{% endif %}
                 </div>
             {% endfor %}

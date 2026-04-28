@@ -1,26 +1,144 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="card shadow-sm">
-    <div class="card-header d-flex justify-content-between align-items-center">
-        <h5 class="mb-0">Point of Sale - Macike Enterprise</h5>
-        <span class="badge text-bg-primary">Fast Checkout</span>
-    </div>
-    <div class="card-body">
-        <p class="text-muted">Process customer transactions and auto-update inventory in real time.</p>
-        <form method="post" class="row g-3">
-            {% csrf_token %}
-            {% for field in form %}
-                <div class="col-md-6">
-                    <label class="form-label">{{ field.label }}{% if field.field.required %} <span class="text-danger">*</span>{% endif %}</label>
-                    {{ field }}
-                    {% if field.errors %}<div class="text-danger small">{{ field.errors|striptags }}</div>{% endif %}
-                </div>
-            {% endfor %}
-            <div class="col-12">
-                <button type="submit" class="btn btn-primary">Checkout & Generate Receipt</button>
+<div class="row g-4 align-items-start">
+    <div class="col-lg-7">
+        <div class="card shadow-sm">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Point of Sale — Macike Enterprise</h5>
+                <span class="badge text-bg-primary">Checkout</span>
             </div>
-        </form>
-        <p class="text-muted mt-3 mb-0">After checkout, a receipt page opens with PDF download.</p>
+            <div class="card-body">
+                <p class="text-muted small mb-3">Customer <strong>name</strong> is always required. <strong>Address</strong> and <strong>region</strong> are required only for <strong>card</strong> payments. Phone is optional unless M-Pesa requires it in Settings.</p>
+                <form method="post" class="row g-3" id="posForm">
+                    {% csrf_token %}
+                    {% for field in form %}
+                        <div class="col-md-6">
+                            <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %} <span class="text-danger">*</span>{% endif %}</label>
+                            {{ field }}
+                            {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+                            {% if field.errors %}<div class="text-danger small">{{ field.errors|striptags }}</div>{% endif %}
+                        </div>
+                    {% endfor %}
+                    <div class="col-12">
+                        <button type="submit" class="btn btn-primary btn-lg">Checkout &amp; generate receipt</button>
+                    </div>
+                </form>
+                <p class="text-muted mt-3 mb-0 small">M-Pesa: approve the STK prompt on the phone; the receipt updates when Daraja confirms payment.</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-5">
+        <div class="card shadow-sm border-primary border-opacity-25 sticky-lg-top" style="top: 1rem;">
+            <div class="card-header bg-primary text-white py-3">
+                <h5 class="mb-0"><i class="bi bi-calculator me-2"></i>Order summary</h5>
+            </div>
+            <div class="card-body py-4">
+                <p class="text-muted small mb-3">Unit price from catalogue; VAT from Settings. Discount applies before VAT.</p>
+                <div class="d-flex justify-content-between mb-2 fs-6">
+                    <span>Unit price</span>
+                    <strong id="posUnitPrice">{{ pos_currency }} 0.00</strong>
+                </div>
+                <div class="d-flex justify-content-between mb-2 fs-6">
+                    <span>Quantity</span>
+                    <strong id="posQtyDisplay">0</strong>
+                </div>
+                <div class="d-flex justify-content-between mb-2 fs-6">
+                    <span>Line subtotal</span>
+                    <strong id="posSubtotal">{{ pos_currency }} 0.00</strong>
+                </div>
+                <div class="d-flex justify-content-between mb-2 fs-6 text-danger">
+                    <span>Discount</span>
+                    <strong id="posDiscount">{{ pos_currency }} 0.00</strong>
+                </div>
+                <div class="d-flex justify-content-between mb-2 fs-6">
+                    <span>After discount</span>
+                    <strong id="posAfterDisc">{{ pos_currency }} 0.00</strong>
+                </div>
+                <div class="d-flex justify-content-between mb-3 fs-6">
+                    <span>VAT (<span id="posVatLabel">{{ pos_vat_rate }}</span>%)</span>
+                    <strong id="posVat">{{ pos_currency }} 0.00</strong>
+                </div>
+                <hr>
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="fs-5">Amount due</span>
+                    <span class="fs-3 fw-bold text-primary" id="posTotal">{{ pos_currency }} 0.00</span>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
+<script>
+(function () {
+    const prices = {{ pos_product_prices_json|safe }};
+    const vatPct = Number({{ pos_vat_rate|floatformat:2 }});
+    const currency = "{{ pos_currency|escapejs }}";
+    const productEl = document.getElementById("id_product");
+    const qtyEl = document.getElementById("id_quantity");
+    const discKesEl = document.getElementById("id_discount_kes");
+    const discPctEl = document.getElementById("id_discount_percent");
+    const unitEl = document.getElementById("posUnitPrice");
+    const qtyDispEl = document.getElementById("posQtyDisplay");
+    const subEl = document.getElementById("posSubtotal");
+    const discEl = document.getElementById("posDiscount");
+    const afterEl = document.getElementById("posAfterDisc");
+    const vatEl = document.getElementById("posVat");
+    const totEl = document.getElementById("posTotal");
+    const vatLabel = document.getElementById("posVatLabel");
+    if (vatLabel) vatLabel.textContent = String(vatPct);
+
+    let discountTouched = null;
+
+    function fmt(n) {
+        return (Math.round(n * 100) / 100).toFixed(2);
+    }
+
+    function bindDisc(el, kind) {
+        if (!el) return;
+        el.addEventListener("input", function () { discountTouched = kind; refresh(); });
+        el.addEventListener("change", function () { discountTouched = kind; refresh(); });
+    }
+    bindDisc(discKesEl, "kes");
+    bindDisc(discPctEl, "pct");
+
+    function refresh() {
+        if (!productEl || !qtyEl) return;
+        const pid = productEl.value;
+        const qty = parseInt(qtyEl.value, 10) || 0;
+        const unit = parseFloat(prices[pid]) || 0;
+        const gross = unit * qty;
+        let dk = parseFloat(discKesEl && discKesEl.value) || 0;
+        let dp = parseFloat(discPctEl && discPctEl.value) || 0;
+        if (discountTouched === "pct" && gross > 0) {
+            dk = gross * (dp / 100);
+            if (discKesEl) discKesEl.value = fmt(dk);
+        } else if (discountTouched === "kes" && gross > 0) {
+            dp = (dk / gross) * 100;
+            if (discPctEl) discPctEl.value = fmt(dp);
+        } else if (gross > 0 && dk > 0 && dp <= 0) {
+            dp = (dk / gross) * 100;
+            if (discPctEl) discPctEl.value = fmt(dp);
+        } else if (gross > 0 && dp > 0 && dk <= 0) {
+            dk = gross * (dp / 100);
+            if (discKesEl) discKesEl.value = fmt(dk);
+        }
+        dk = Math.min(Math.max(0, dk), gross);
+        const after = Math.max(0, gross - dk);
+        const vat = after * (vatPct / 100);
+        const total = after + vat;
+        unitEl.textContent = currency + " " + fmt(unit);
+        qtyDispEl.textContent = String(qty);
+        subEl.textContent = currency + " " + fmt(gross);
+        discEl.textContent = currency + " " + fmt(dk);
+        afterEl.textContent = currency + " " + fmt(after);
+        vatEl.textContent = currency + " " + fmt(vat);
+        totEl.textContent = currency + " " + fmt(total);
+    }
+
+    ["change", "input"].forEach(function (ev) {
+        if (productEl) productEl.addEventListener(ev, function () { refresh(); });
+        if (qtyEl) qtyEl.addEventListener(ev, function () { refresh(); });
+    });
+    refresh();
+})();
+</script>
 {% endblock %}

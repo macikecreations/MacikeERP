@@ -42,7 +42,12 @@ SECRET_KEY = 'django-insecure-edid@i!jn4r5j=*l0*2j5rhgpq6i=aqlgq5^ullb84(xbg=)5x
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+# Comma-separated hostnames. Add your ngrok host for Daraja callbacks, e.g. abc.ngrok-free.app
+ALLOWED_HOSTS = [
+    h.strip()
+    for h in os.getenv("ALLOWED_HOSTS", "127.0.0.1,localhost").split(",")
+    if h.strip()
+]
 
 
 # Application definition

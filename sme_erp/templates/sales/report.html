@@ -8,9 +8,9 @@
     <a class="btn btn-outline-primary btn-sm" href="/backup/export/csv/">Export Backup</a>
 </div>
 <div class="row g-3 mb-4">
-    <div class="col-md-4"><div class="card shadow-sm"><div class="card-body"><p class="app-subtitle mb-1">Daily Revenue</p><h4>KES {{ daily_total }}</h4></div></div></div>
-    <div class="col-md-4"><div class="card shadow-sm"><div class="card-body"><p class="app-subtitle mb-1">Weekly Revenue</p><h4>KES {{ weekly_total }}</h4></div></div></div>
-    <div class="col-md-4"><div class="card shadow-sm"><div class="card-body"><p class="app-subtitle mb-1">Monthly Revenue</p><h4>KES {{ monthly_total }}</h4></div></div></div>
+    <div class="col-md-4"><div class="card shadow-sm"><div class="card-body"><p class="app-subtitle mb-1">Daily Revenue</p><h4>KES {{ daily_total|floatformat:2 }}</h4></div></div></div>
+    <div class="col-md-4"><div class="card shadow-sm"><div class="card-body"><p class="app-subtitle mb-1">Weekly Revenue</p><h4>KES {{ weekly_total|floatformat:2 }}</h4></div></div></div>
+    <div class="col-md-4"><div class="card shadow-sm"><div class="card-body"><p class="app-subtitle mb-1">Monthly Revenue</p><h4>KES {{ monthly_total|floatformat:2 }}</h4></div></div></div>
 </div>
 <div class="card shadow-sm mb-4">
     <div class="card-header"><h5 class="mb-0">Payment Entries Summary</h5></div>
@@ -26,9 +26,9 @@
             <tbody>
                 {% for row in payment_breakdown %}
                     <tr>
-                        <td>{{ row.payment_method }}</td>
+                        <td>{{ row.label }}</td>
                         <td>{{ row.count }}</td>
-                        <td>KES {{ row.total|default:"0.00" }}</td>
+                        <td>KES {{ row.total|floatformat:2 }}</td>
                     </tr>
                 {% empty %}
                     <tr><td colspan="3" class="text-center">No payment entries yet.</td></tr>
@@ -78,7 +78,7 @@
                         <td>{{ tx.phone_number }}</td>
                         <td>{{ tx.mpesa_code|default:tx.checkout_request_id }}</td>
                         <td>{{ tx.get_status_display }}</td>
-                        <td>KES {{ tx.amount }}</td>
+                        <td>KES {{ tx.amount|floatformat:2 }}</td>
                     </tr>
                 {% empty %}
                     <tr><td colspan="5" class="text-center">No M-Pesa entries yet.</td></tr>

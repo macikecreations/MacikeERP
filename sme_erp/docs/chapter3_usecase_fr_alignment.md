@@ -4,10 +4,12 @@ This document maps the implemented system to Chapter 3 functional requirements a
 
 ## Use-Case Actors (Implemented)
 
-- **Administrator**: manages users (via Django admin), products, categories, suppliers, restock, reports, backup.
-- **Manager**: manages products, categories, suppliers, restock, reports, backup.
-- **Cashier**: performs POS checkout and prints receipt.
-- **Auditor**: views reports/receipts/dashboard and exports backup (read-focused role).
+- **Administrator**: manages users (via Django admin), products, categories, suppliers, restock, reports, backup, **and POS checkout** (full operational access).
+- **Manager** (often the SME owner / “MD” in org charts): manages products, categories, suppliers, restock, reports, backup, **and POS checkout** — same as Chapter 3 expectation that supervisors can sell at the till when needed; not “too senior” to be blocked from POS.
+- **Cashier**: primary role for POS checkout and receipts.
+- **Auditor**: views reports/receipts/dashboard and exports backup (read-focused role; **no** POS).
+
+Implemented enforcement: `@role_required("ADMIN", "MANAGER", "CASHIER")` on POS; **AUDITOR** is intentionally excluded from checkout.
 
 ## Functional Requirements Traceability
 

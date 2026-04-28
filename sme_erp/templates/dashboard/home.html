@@ -27,76 +27,109 @@
     <div class="col-md-4"><div class="card shadow-sm"><div class="card-body"><p class="app-subtitle mb-1">Total Invoices</p><div class="top-stat">{{ invoice_count }}</div></div></div></div>
     <div class="col-md-4"><div class="card shadow-sm"><div class="card-body"><p class="app-subtitle mb-1">Low Stock Items</p><div class="top-stat text-danger">{{ low_stock_count }}</div></div></div></div>
 </div>
-<div class="row g-3">
-    <div class="col-lg-4">
-        <div class="card shadow-sm h-100">
-            <div class="card-header"><h5 class="mb-0">Low Stock Alerts</h5></div>
-            <ul class="list-group list-group-flush">
-                {% for item in low_stock_items %}
-                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                        <span>{{ item.name }}</span>
-                        <span class="badge badge-soft-danger">Qty {{ item.quantity }}</span>
-                    </li>
-                {% empty %}
-                    <li class="list-group-item">No low stock alerts.</li>
-                {% endfor %}
-            </ul>
-        </div>
-    </div>
-    <div class="col-lg-4">
-        <div class="card shadow-sm h-100">
-            <div class="card-header"><h5 class="mb-0">Recent Sales</h5></div>
-            <ul class="list-group list-group-flush">
-                {% for inv in recent_sales %}
-                    <li class="list-group-item d-flex justify-content-between">
-                        <span>INV-{{ inv.id }} ({{ inv.cashier.username }})</span>
-                        <strong>{{ inv.total_amount }}</strong>
-                    </li>
-                {% empty %}
-                    <li class="list-group-item">No sales yet.</li>
-                {% endfor %}
-            </ul>
-        </div>
-    </div>
-    <div class="col-lg-4">
-        <div class="card shadow-sm h-100">
-            <div class="card-header"><h5 class="mb-0">Recent Stock Activity</h5></div>
-            <ul class="list-group list-group-flush">
-                {% for log in recent_activity %}
-                    <li class="list-group-item">{{ log.action_type }} {{ log.quantity_changed }} - {{ log.product.name }}</li>
-                {% empty %}
-                    <li class="list-group-item">No activity yet.</li>
-                {% endfor %}
-            </ul>
-        </div>
-    </div>
+<div class="card shadow-sm mb-4">
+    <div class="card-header"><h5 class="mb-0">Low Stock Alerts</h5></div>
+    <ul class="list-group list-group-flush">
+        {% for item in low_stock_items %}
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+                <span>{{ item.name }}</span>
+                <span class="badge badge-soft-danger">Qty {{ item.quantity }}</span>
+            </li>
+        {% empty %}
+            <li class="list-group-item">No low stock alerts.</li>
+        {% endfor %}
+    </ul>
 </div>
-<div class="row g-3 mt-1">
-    <div class="col-lg-6">
+<div class="row g-3 mb-4">
+    <div class="col-lg-4">
         <div class="card shadow-sm h-100">
             <div class="card-header"><h5 class="mb-0">Sales Trend (Last 7 Days)</h5></div>
-            <div class="card-body">
-                <canvas id="salesTrendChart" height="120"></canvas>
+            <div class="card-body chart-wrap" style="height: 260px; position: relative;">
+                <canvas id="salesTrendChart"></canvas>
             </div>
         </div>
     </div>
-    <div class="col-lg-3">
+    <div class="col-lg-4">
         <div class="card shadow-sm h-100">
             <div class="card-header"><h5 class="mb-0">Payment Mix</h5></div>
-            <div class="card-body">
-                <canvas id="paymentMixChart" height="120"></canvas>
+            <div class="card-body chart-wrap" style="height: 260px; position: relative;">
+                <canvas id="paymentMixChart"></canvas>
             </div>
         </div>
     </div>
-    <div class="col-lg-3">
+    <div class="col-lg-4">
         <div class="card shadow-sm h-100">
-            <div class="card-header"><h5 class="mb-0">Top Products</h5></div>
-            <div class="card-body">
-                <canvas id="topProductsChart" height="120"></canvas>
+            <div class="card-header"><h5 class="mb-0">Top Products (by qty sold)</h5></div>
+            <div class="card-body chart-wrap chart-wrap--bars" style="height: 260px; position: relative;">
+                <canvas id="topProductsChart"></canvas>
             </div>
         </div>
     </div>
 </div>
+<div class="row g-3 align-items-stretch">
+    <div class="col-lg-6 d-flex">
+        <div class="card shadow-sm flex-fill d-flex flex-column w-100 dashboard-panel-equal">
+            <div class="card-header">
+                <h5 class="mb-0">Recent Sales</h5>
+                <p class="text-muted small mb-0 mt-2">Paid invoice totals ({{ app_settings.currency_code }})</p>
+                <div class="row g-2 mt-2 small">
+                    <div class="col-4">
+                        <div class="border rounded p-2 h-100 bg-body-secondary bg-opacity-10">
+                            <div class="text-muted text-uppercase" style="font-size: 0.7rem;">Today</div>
+                            <div class="fw-semibold">{{ sales_total_today|floatformat:2 }}</div>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="border rounded p-2 h-100 bg-body-secondary bg-opacity-10">
+                            <div class="text-muted text-uppercase" style="font-size: 0.7rem;">Week</div>
+                            <div class="fw-semibold">{{ sales_total_week|floatformat:2 }}</div>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="border rounded p-2 h-100 bg-body-secondary bg-opacity-10">
+                            <div class="text-muted text-uppercase" style="font-size: 0.7rem;">Month</div>
+                            <div class="fw-semibold">{{ sales_total_month|floatformat:2 }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body p-0 flex-grow-1 d-flex flex-column dashboard-list-body">
+                <ul class="list-group list-group-flush flex-grow-1 mb-0">
+                    {% for inv in recent_sales %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <span>INV-{{ inv.id }} <span class="text-muted">({{ inv.cashier.username }})</span></span>
+                            <strong>{{ inv.total_amount|floatformat:2 }}</strong>
+                        </li>
+                    {% empty %}
+                        <li class="list-group-item">No sales yet.</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-6 d-flex">
+        <div class="card shadow-sm flex-fill d-flex flex-column w-100 dashboard-panel-equal">
+            <div class="card-header">
+                <h5 class="mb-0">Recent Stock Activity</h5>
+                <p class="text-muted small mb-0 mt-1">Latest 5 stock movements</p>
+            </div>
+            <div class="card-body p-0 flex-grow-1 d-flex flex-column dashboard-list-body">
+                <ul class="list-group list-group-flush flex-grow-1 mb-0">
+                    {% for log in recent_activity %}
+                        <li class="list-group-item">{{ log.action_type }} {{ log.quantity_changed }} — {{ log.product.name }}</li>
+                    {% empty %}
+                        <li class="list-group-item">No activity yet.</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+<style>
+    .dashboard-panel-equal { min-height: 320px; }
+    .dashboard-list-body { min-height: 220px; }
+    .dashboard-list-body .list-group-item { min-height: 3rem; display: flex; align-items: center; }
+</style>
 {{ sales_labels|json_script:"sales-labels" }}
 {{ sales_series|json_script:"sales-series" }}
 {{ payment_labels|json_script:"payment-labels" }}
@@ -131,7 +164,15 @@
                     tension: 0.3
                 }]
             },
-            options: { responsive: true, plugins: { legend: { display: false } } }
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: { ticks: { color: tickColor }, grid: { color: gridColor } },
+                    y: { ticks: { color: tickColor }, grid: { color: gridColor } },
+                },
+            },
         });
 
         new Chart(document.getElementById("paymentMixChart"), {
@@ -145,9 +186,11 @@
             },
             options: {
                 responsive: true,
+                maintainAspectRatio: false,
                 plugins: {
                     legend: {
-                        labels: { color: legendColor }
+                        position: "bottom",
+                        labels: { color: legendColor, boxWidth: 12 }
                     }
                 }
             }
@@ -158,33 +201,43 @@
             data: {
                 labels: topProductLabels,
                 datasets: [{
-                    label: "Qty",
+                    label: "Qty sold",
                     data: topProductValues,
                     backgroundColor: "#1f9d8b"
                 }]
             },
             options: {
                 responsive: true,
+                maintainAspectRatio: false,
                 indexAxis: "y",
-                plugins: { legend: { display: false } },
+                layout: { padding: { left: 4, right: 12, top: 8, bottom: 8 } },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            title: function (items) {
+                                const i = items[0].dataIndex;
+                                return topProductLabels[i] || "";
+                            }
+                        }
+                    }
+                },
                 scales: {
                     x: {
-                        ticks: { color: tickColor },
+                        ticks: { color: tickColor, precision: 0 },
                         grid: { color: gridColor }
                     },
                     y: {
-                        ticks: { color: tickColor },
-                        grid: { color: gridColor }
+                        ticks: {
+                            color: tickColor,
+                            autoSkip: false,
+                            font: { size: 11 }
+                        },
+                        grid: { display: false }
                     }
                 }
             }
         });
-
-        Chart.getChart("salesTrendChart").options.scales = {
-            x: { ticks: { color: tickColor }, grid: { color: gridColor } },
-            y: { ticks: { color: tickColor }, grid: { color: gridColor } },
-        };
-        Chart.getChart("salesTrendChart").update();
     })();
 </script>
 {% endblock %}

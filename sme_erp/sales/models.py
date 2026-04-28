@@ -36,7 +36,20 @@ class SalesInvoice(models.Model):
 
     cashier = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="invoices")
     customer = models.ForeignKey(Customer, on_delete=models.SET_NULL, null=True, blank=True, related_name="invoices")
-    customer_name = models.CharField(max_length=100, default="Walk-in")
+    customer_name = models.CharField(max_length=100, default="")
+    discount_amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=0,
+        help_text="Absolute discount applied before VAT (from line subtotal).",
+    )
+    discount_percent = models.DecimalField(
+        max_digits=7,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="Percent snapshot at checkout (for display/audit).",
+    )
     total_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     tax_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     payment_method = models.CharField(max_length=20, choices=PaymentMethod.choices, default=PaymentMethod.CASH)
@@ -51,10 +64,21 @@ class SalesInvoice(models.Model):
         return f"INV-{self.id or 'NEW'}"
 
     def recalculate_totals(self) -> None:
-        subtotal = sum((line.subtotal for line in self.line_items.all()), Decimal("0.00"))
-        self.tax_amount = (subtotal * Decimal("0.16")).quantize(Decimal("0.01"))
-        self.total_amount = (subtotal + self.tax_amount).quantize(Decimal("0.01"))
-        self.save(update_fields=["tax_amount", "total_amount"])
+        from dashboard.models import AppSettings
+
+        app = AppSettings.get_solo()
+        rate = Decimal(str(app.vat_rate)) / Decimal("100")
+        gross = sum((line.subtotal for line in self.line_items.all()), Decimal("0.00"))
+        disc = Decimal(str(self.discount_amount or 0)).quantize(Decimal("0.01"))
+        if disc < 0:
+            disc = Decimal("0.00")
+        if disc > gross:
+            disc = gross
+        self.discount_amount = disc
+        net = gross - disc
+        self.tax_amount = (net * rate).quantize(Decimal("0.01"))
+        self.total_amount = (net + self.tax_amount).quantize(Decimal("0.01"))
+        self.save(update_fields=["discount_amount", "tax_amount", "total_amount"])
 
 
 class SalesLineItem(models.Model):
@@ -75,7 +99,7 @@ class MpesaTransaction(models.Model):
     mpesa_code = models.CharField(max_length=20, unique=True, blank=True, null=True)
     merchant_request_id = models.CharField(max_length=100, blank=True, null=True)
     checkout_request_id = models.CharField(max_length=100, unique=True, blank=True, null=True)
-    phone_number = models.CharField(max_length=15)
+    phone_number = models.CharField(max_length=20)
     amount = models.DecimalField(max_digits=12, decimal_places=2)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
     result_desc = models.CharField(max_length=255, blank=True)

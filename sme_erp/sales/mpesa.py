@@ -6,7 +6,47 @@ from django.conf import settings
 
 
 class MpesaConfigError(Exception):
-    pass
+    """Missing or invalid environment configuration."""
+
+
+class MpesaAPIError(Exception):
+    """Daraja rejected the request or returned an error payload (HTTP may still be 200)."""
+
+
+def normalize_msisdn_for_daraja(raw: str) -> str:
+    """Return MSISDN as 2547XXXXXXXX for Lipa na M-Pesa STK (sandbox/production)."""
+    if not raw or not str(raw).strip():
+        raise ValueError("Phone number is required.")
+    s = str(raw).strip().replace(" ", "").replace("-", "")
+    if s.startswith("+"):
+        s = s[1:]
+    if not s.isdigit():
+        raise ValueError("Use digits only (optional country code or leading +).")
+    if s.startswith("254") and len(s) == 12 and s[3] == "7":
+        return s
+    if s.startswith("0") and len(s) == 10 and s[1] == "7":
+        return "254" + s[1:]
+    if len(s) == 9 and s[0] == "7":
+        return "254" + s
+    raise ValueError("Use a valid Kenya mobile: 07XXXXXXXX, 2547XXXXXXXX, or +2547XXXXXXXX.")
+
+
+def _raise_if_stk_error(data: object) -> None:
+    if not isinstance(data, dict):
+        raise MpesaAPIError("Unexpected response from M-Pesa.")
+    fault = data.get("fault")
+    if isinstance(fault, dict) and fault.get("faultstring"):
+        raise MpesaAPIError(str(fault["faultstring"]))
+    if data.get("errorMessage") or data.get("errorCode"):
+        raise MpesaAPIError(str(data.get("errorMessage") or data.get("errorCode")))
+    rc = data.get("ResponseCode")
+    if rc is None:
+        raise MpesaAPIError(str(data.get("ResponseDescription") or "Invalid M-Pesa response (no ResponseCode)."))
+    if str(rc).strip() != "0":
+        msg = data.get("ResponseDescription") or data.get("CustomerMessage") or "STK request was not accepted."
+        raise MpesaAPIError(str(msg))
+    if not data.get("CheckoutRequestID"):
+        raise MpesaAPIError("M-Pesa did not return a CheckoutRequestID.")
 
 
 def _base_url() -> str:
@@ -56,4 +96,6 @@ def initiate_stk_push(*, phone_number: str, amount: int, account_reference: str,
     url = f"{_base_url()}/mpesa/stkpush/v1/processrequest"
     response = requests.post(url, json=body, headers=headers, timeout=settings.MPESA_TIMEOUT_SECONDS)
     response.raise_for_status()
-    return response.json()
+    payload = response.json()
+    _raise_if_stk_error(payload)
+    return payload
