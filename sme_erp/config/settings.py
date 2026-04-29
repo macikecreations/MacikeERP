@@ -40,7 +40,7 @@ _load_env_file(BASE_DIR / ".env")
 SECRET_KEY = 'django-insecure-edid@i!jn4r5j=*l0*2j5rhgpq6i=aqlgq5^ullb84(xbg=)5x'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.getenv("DEBUG", "True").lower() in ("1", "true", "yes", "on")
 
 # Comma-separated hostnames in ALLOWED_HOSTS (.env). Production domain and VPS IP are always merged in.
 _base_allowed = [h.strip() for h in os.getenv("ALLOWED_HOSTS", "127.0.0.1,localhost").split(",") if h.strip()]
@@ -142,6 +142,7 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 STATICFILES_DIRS = [BASE_DIR / "static"]
+STATIC_ROOT = BASE_DIR / "staticfiles"
 
 LOGIN_URL = 'login'
 LOGIN_REDIRECT_URL = 'dashboard-home'
