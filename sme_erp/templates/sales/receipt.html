@@ -42,7 +42,9 @@
             <p class="text-muted mb-0">Official sales receipt and payment entries.</p>
         </div>
         <div class="d-flex gap-2">
+            {% if can_add_payment_entry %}
             <a class="btn btn-primary" href="/sales/receipt/{{ invoice.id }}/payments/new/">Add Payment Entry</a>
+            {% endif %}
             <a class="btn btn-outline-primary" href="/sales/receipt/{{ invoice.id }}/pdf/">Download PDF</a>
             <button type="button" class="btn btn-outline-secondary" onclick="window.print()">Print</button>
         </div>

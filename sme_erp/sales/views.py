@@ -9,7 +9,7 @@ import requests
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db import models, transaction
-from django.http import FileResponse, HttpResponse
+from django.http import FileResponse, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
@@ -33,6 +33,22 @@ def _mark_invoice_failed(invoice_id: int | None) -> None:
     if invoice_id is None:
         return
     SalesInvoice.objects.filter(pk=invoice_id).update(status=SalesInvoice.Status.FAILED)
+
+
+def _reconcile_invoice_status_from_mpesa(invoice: SalesInvoice) -> SalesInvoice:
+    """
+    Keep invoice status aligned with completed M-Pesa callbacks.
+
+    In rare edge cases (callback timing or transient errors), an invoice may stay
+    pending even though at least one linked M-Pesa transaction completed.
+    """
+    if invoice.payment_method != SalesInvoice.PaymentMethod.MPESA:
+        return invoice
+    has_completed_tx = invoice.mpesa_transactions.filter(status=MpesaTransaction.Status.COMPLETED).exists()
+    if has_completed_tx and invoice.status != SalesInvoice.Status.PAID:
+        SalesInvoice.objects.filter(pk=invoice.pk).update(status=SalesInvoice.Status.PAID)
+        invoice.status = SalesInvoice.Status.PAID
+    return invoice
 
 
 def _coerce_mpesa_metadata_phone(value) -> str:
@@ -230,8 +246,8 @@ def quick_sale(request):
                 request,
                 f"STK push sent to {phone_number}. Approve on the handset; this page updates when Daraja calls back.",
             )
-            if app_settings.auto_open_receipt:
-                return redirect("sales-receipt", invoice_id=invoice.id)
+            request.session["mpesa_watch_invoice_id"] = invoice.id
+            # For M-Pesa, do not open receipt immediately; payment is asynchronous.
             return redirect("sales-pos")
         else:
             try:
@@ -270,6 +286,43 @@ def quick_sale(request):
         messages.error(request, "Checkout could not proceed. Please correct the highlighted fields and try again.")
 
     return render(request, "sales/pos.html", _pos_page_context(form, app_settings))
+
+
+@login_required
+@role_required("ADMIN", "MANAGER", "CASHIER")
+def mpesa_status(request):
+    invoice_id = request.session.get("mpesa_watch_invoice_id")
+    if not invoice_id:
+        return JsonResponse({"watching": False})
+
+    invoice = (
+        SalesInvoice.objects.filter(id=invoice_id, cashier=request.user)
+        .prefetch_related("mpesa_transactions")
+        .first()
+    )
+    if invoice is None:
+        request.session.pop("mpesa_watch_invoice_id", None)
+        return JsonResponse({"watching": False})
+
+    tx = invoice.mpesa_transactions.order_by("-id").first()
+    tx_status = tx.status if tx else ""
+    tx_desc = tx.result_desc if tx else ""
+
+    invoice = _reconcile_invoice_status_from_mpesa(invoice)
+    is_terminal = invoice.status in {SalesInvoice.Status.PAID, SalesInvoice.Status.FAILED}
+    if is_terminal:
+        request.session.pop("mpesa_watch_invoice_id", None)
+
+    return JsonResponse(
+        {
+            "watching": True,
+            "invoice_id": invoice.id,
+            "invoice_status": invoice.status,
+            "transaction_status": tx_status,
+            "result_desc": tx_desc,
+            "is_terminal": is_terminal,
+        }
+    )
 
 
 @csrf_exempt
@@ -342,6 +395,7 @@ def receipt_view(request, invoice_id: int):
         SalesInvoice.objects.select_related("cashier", "customer"),
         id=invoice_id,
     )
+    invoice = _reconcile_invoice_status_from_mpesa(invoice)
     subtotal_amount = sum((line.subtotal for line in invoice.line_items.all()), Decimal("0.00"))
     disc = Decimal(str(invoice.discount_amount or 0)).quantize(Decimal("0.01"))
     taxable_after_discount = (subtotal_amount - disc).quantize(Decimal("0.01"))
@@ -350,6 +404,15 @@ def receipt_view(request, invoice_id: int):
     posted_entries = payment_entries.filter(status=PaymentEntry.Status.POSTED)
     total_paid = sum((entry.amount for entry in posted_entries), Decimal("0.00"))
     amount_words = _num_to_words(int(invoice.total_amount))
+    if invoice.payment_method == SalesInvoice.PaymentMethod.MPESA:
+        mpesa_completed = mpesa_entries.filter(status=MpesaTransaction.Status.COMPLETED).exists()
+        mpesa_pending = mpesa_entries.filter(status=MpesaTransaction.Status.PENDING).exists()
+        if mpesa_completed:
+            total_paid = invoice.total_amount
+        elif mpesa_pending:
+            total_paid = Decimal("0.00")
+    balance_due = invoice.total_amount - total_paid
+    can_add_payment_entry = balance_due > 0 and invoice.status != SalesInvoice.Status.PAID
     customer_phone_display = ""
     if invoice.customer_id and invoice.customer.mobile:
         customer_phone_display = invoice.customer.mobile
@@ -368,7 +431,8 @@ def receipt_view(request, invoice_id: int):
             "mpesa_entries": mpesa_entries,
             "payment_entries": payment_entries,
             "total_paid": total_paid,
-            "balance_due": invoice.total_amount - total_paid,
+            "balance_due": balance_due,
+            "can_add_payment_entry": can_add_payment_entry,
             "amount_words": amount_words,
             "customer_phone_display": customer_phone_display,
         },
@@ -552,6 +616,7 @@ def receipt_pdf(request, invoice_id: int):
         SalesInvoice.objects.select_related("cashier", "customer").prefetch_related("mpesa_transactions"),
         id=invoice_id,
     )
+    invoice = _reconcile_invoice_status_from_mpesa(invoice)
     cust_phone = ""
     if invoice.customer_id and invoice.customer.mobile:
         cust_phone = invoice.customer.mobile

@@ -1,4 +1,29 @@
 {% extends "base.html" %}
+{% block extra_head %}
+<style>
+    .mpesa-status-popup {
+        min-width: 320px;
+        max-width: 420px;
+        font-weight: 600;
+        border-width: 2px;
+    }
+    .mpesa-status-paid {
+        background-color: #198754;
+        border-color: #198754;
+        color: #fff;
+    }
+    .mpesa-status-failed {
+        background-color: #dc3545;
+        border-color: #dc3545;
+        color: #fff;
+    }
+    .mpesa-status-pending {
+        background-color: #ffc107;
+        border-color: #ffc107;
+        color: #212529;
+    }
+</style>
+{% endblock %}
 {% block content %}
 {% if form.errors %}
 <div class="alert alert-danger">
@@ -69,6 +94,14 @@
                     <span class="fs-3 fw-bold text-primary" id="posTotal">{{ pos_currency }} 0.00</span>
                 </div>
             </div>
+        </div>
+    </div>
+</div>
+<div class="position-fixed top-0 end-0 p-3" style="z-index: 1080;">
+    <div id="mpesaStatusPopup" class="alert shadow d-none mb-0 mpesa-status-popup" role="status" aria-live="polite" aria-atomic="true">
+        <div class="d-flex align-items-start gap-2">
+            <div id="mpesaStatusPopupBody" class="small"></div>
+            <button type="button" class="btn-close ms-2" aria-label="Close" id="mpesaStatusPopupClose"></button>
         </div>
     </div>
 </div>
@@ -144,6 +177,84 @@
         if (qtyEl) qtyEl.addEventListener(ev, function () { refresh(); });
     });
     refresh();
+})();
+
+(function () {
+    const statusUrl = "{% url 'mpesa-status' %}";
+    const popupEl = document.getElementById("mpesaStatusPopup");
+    const popupBodyEl = document.getElementById("mpesaStatusPopupBody");
+    const popupCloseEl = document.getElementById("mpesaStatusPopupClose");
+    if (!popupEl || !popupBodyEl) return;
+
+    let lastState = "";
+    let pollTimer = null;
+    let hideTimer = null;
+
+    function showStatus(text, kind) {
+        popupBodyEl.textContent = text;
+        popupEl.classList.remove("d-none");
+        popupEl.style.borderStyle = "solid";
+        popupEl.style.borderWidth = "2px";
+        if (kind === "mpesa-status-paid") {
+            popupEl.style.backgroundColor = "#198754";
+            popupEl.style.borderColor = "#198754";
+            popupEl.style.color = "#ffffff";
+        } else if (kind === "mpesa-status-failed") {
+            popupEl.style.backgroundColor = "#dc3545";
+            popupEl.style.borderColor = "#dc3545";
+            popupEl.style.color = "#ffffff";
+        } else {
+            popupEl.style.backgroundColor = "#ffc107";
+            popupEl.style.borderColor = "#ffc107";
+            popupEl.style.color = "#212529";
+        }
+        if (hideTimer) clearTimeout(hideTimer);
+        hideTimer = setTimeout(function () {
+            popupEl.classList.add("d-none");
+        }, 9000);
+    }
+
+    if (popupCloseEl) {
+        popupCloseEl.addEventListener("click", function () {
+            popupEl.classList.add("d-none");
+        });
+    }
+
+    function pollStatus() {
+        fetch(statusUrl, { headers: { "X-Requested-With": "XMLHttpRequest" } })
+            .then(function (res) { return res.ok ? res.json() : Promise.reject(new Error("status fetch failed")); })
+            .then(function (data) {
+                if (!data.watching) {
+                    if (pollTimer) clearInterval(pollTimer);
+                    return;
+                }
+
+                const state = String(data.invoice_status || "");
+                if (state === lastState) return;
+                lastState = state;
+
+                if (state === "PENDING_PAYMENT") {
+                    showStatus("M-Pesa request sent. Waiting for customer confirmation on phone.", "mpesa-status-pending");
+                    return;
+                }
+                if (state === "PAID") {
+                    showStatus("Payment received successfully. Invoice INV-" + data.invoice_id + " is now PAID.", "mpesa-status-paid");
+                    if (pollTimer) clearInterval(pollTimer);
+                    return;
+                }
+                if (state === "FAILED") {
+                    const reason = data.result_desc ? " Reason: " + data.result_desc : "";
+                    showStatus("M-Pesa payment failed for invoice INV-" + data.invoice_id + "." + reason, "mpesa-status-failed");
+                    if (pollTimer) clearInterval(pollTimer);
+                }
+            })
+            .catch(function () {
+                // Keep polling; temporary network issues should not break status tracking.
+            });
+    }
+
+    pollStatus();
+    pollTimer = setInterval(pollStatus, 5000);
 })();
 </script>
 {% endblock %}
