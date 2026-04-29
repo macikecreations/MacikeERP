@@ -95,7 +95,12 @@ def initiate_stk_push(*, phone_number: str, amount: int, account_reference: str,
     headers = {"Authorization": f"Bearer {token}"}
     url = f"{_base_url()}/mpesa/stkpush/v1/processrequest"
     response = requests.post(url, json=body, headers=headers, timeout=settings.MPESA_TIMEOUT_SECONDS)
-    response.raise_for_status()
-    payload = response.json()
+    try:
+        payload = response.json()
+    except ValueError:
+        payload = {}
+    if response.status_code >= 400:
+        _raise_if_stk_error(payload)
+        raise MpesaAPIError(f"M-Pesa HTTP {response.status_code}: {response.text[:240]}")
     _raise_if_stk_error(payload)
     return payload

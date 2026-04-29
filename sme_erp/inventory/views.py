@@ -42,7 +42,6 @@ def product_create(request):
     if request.method == "POST" and form.is_valid():
         with transaction.atomic():
             product = form.save()
-            # If opening stock is set during product creation, seed FIFO with one batch.
             if product.quantity > 0:
                 StockBatch.objects.create(
                     product=product,

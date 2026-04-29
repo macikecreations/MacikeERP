@@ -192,7 +192,6 @@ def quick_sale(request):
                     )
                     invoice.recalculate_totals()
 
-                # STK is HTTP: keep DB transaction short; callback completes payment + stock.
                 stk_response = initiate_stk_push(
                     phone_number=phone_number,
                     amount=int(invoice.total_amount),
@@ -266,6 +265,10 @@ def quick_sale(request):
         if app_settings.auto_open_receipt:
             return redirect("sales-receipt", invoice_id=invoice.id)
         return redirect("sales-pos")
+
+    if request.method == "POST" and not form.is_valid():
+        messages.error(request, "Checkout could not proceed. Please correct the highlighted fields and try again.")
+
     return render(request, "sales/pos.html", _pos_page_context(form, app_settings))
 
 

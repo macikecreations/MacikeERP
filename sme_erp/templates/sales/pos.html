@@ -1,5 +1,10 @@
 {% extends "base.html" %}
 {% block content %}
+{% if form.errors %}
+<div class="alert alert-danger">
+    Checkout validation failed. Review the fields below and fix the errors.
+</div>
+{% endif %}
 <div class="row g-4 align-items-start">
     <div class="col-lg-7">
         <div class="card shadow-sm">

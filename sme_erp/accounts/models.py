@@ -13,7 +13,6 @@ class CustomUser(AbstractUser):
     phone_number = models.CharField(max_length=15, blank=True, null=True)
 
     def save(self, *args, **kwargs):
-        # Keep superusers mapped to admin role for RBAC checks.
         if self.is_superuser and self.role == self.Roles.CASHIER:
             self.role = self.Roles.ADMIN
         super().save(*args, **kwargs)

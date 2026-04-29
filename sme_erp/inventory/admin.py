@@ -9,4 +9,3 @@ admin.site.register(StockBatch)
 admin.site.register(StockAuditLog)
 from django.contrib import admin
 
-# Register your models here.

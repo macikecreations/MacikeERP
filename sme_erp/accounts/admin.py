@@ -12,4 +12,3 @@ class CustomUserAdmin(UserAdmin):
     list_display = ("username", "email", "role", "is_staff", "is_active")
 from django.contrib import admin
 
-# Register your models here.
