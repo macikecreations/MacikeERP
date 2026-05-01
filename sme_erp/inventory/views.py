@@ -2,7 +2,8 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db import models, transaction
-from django.shortcuts import redirect, render
+from django.db.models.deletion import ProtectedError
+from django.shortcuts import get_object_or_404, redirect, render
 
 from accounts.permissions import role_required
 from .forms import ProductCategoryForm, ProductForm, RestockForm, SupplierForm
@@ -61,7 +62,39 @@ def product_create(request):
     if request.method == "POST":
         error_count = sum(len(errs) for errs in form.errors.values())
         messages.error(request, f"Please fix the form errors and try again ({error_count} error(s)).")
-    return render(request, "inventory/product_form.html", {"form": form})
+    return render(request, "inventory/product_form.html", {"form": form, "mode": "create"})
+
+
+@login_required
+@role_required("ADMIN", "MANAGER")
+def product_edit(request, product_id: int):
+    product = get_object_or_404(Product, id=product_id)
+    form = ProductForm(request.POST or None, instance=product)
+    if request.method == "POST" and form.is_valid():
+        form.save()
+        messages.success(request, f"Product '{product.name}' updated successfully.")
+        return redirect("inventory-list")
+    if request.method == "POST":
+        messages.error(request, "Please fix the form errors and try again.")
+    return render(request, "inventory/product_form.html", {"form": form, "mode": "edit", "product_obj": product})
+
+
+@login_required
+@role_required("ADMIN", "MANAGER")
+def product_delete(request, product_id: int):
+    product = get_object_or_404(Product, id=product_id)
+    if request.method == "POST":
+        try:
+            name = product.name
+            product.delete()
+            messages.success(request, f"Product '{name}' deleted.")
+        except ProtectedError:
+            messages.error(
+                request,
+                "Cannot delete this product because it is referenced in existing sales records.",
+            )
+        return redirect("inventory-list")
+    return render(request, "inventory/product_confirm_delete.html", {"product": product})
 
 
 @login_required

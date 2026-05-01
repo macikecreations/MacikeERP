@@ -3,6 +3,7 @@ from datetime import timedelta
 from decimal import Decimal
 
 from django.contrib.auth.decorators import login_required
+from django.db import connection
 from django.db import models
 from django.http import HttpResponse
 from django.shortcuts import redirect, render
@@ -91,6 +92,22 @@ def home(request):
 @login_required
 @role_required("ADMIN", "MANAGER", "AUDITOR")
 def export_backup_csv(request):
+    export_format = (request.GET.get("format") or "csv").strip().lower()
+    if export_format == "sql":
+        if connection.vendor != "sqlite":
+            return HttpResponse(
+                "SQL export is currently supported only for SQLite deployments.",
+                status=400,
+                content_type="text/plain",
+            )
+        response = HttpResponse(content_type="application/sql")
+        response["Content-Disposition"] = 'attachment; filename="erp_backup.sql"'
+        connection.ensure_connection()
+        for statement in connection.connection.iterdump():
+            response.write(statement)
+            response.write(";\n")
+        return response
+
     response = HttpResponse(content_type="text/csv")
     response["Content-Disposition"] = 'attachment; filename="erp_backup_products.csv"'
     writer = csv.writer(response)

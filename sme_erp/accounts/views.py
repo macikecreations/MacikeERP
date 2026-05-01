@@ -4,7 +4,7 @@ from django.contrib import messages
 from django.shortcuts import get_object_or_404, redirect, render
 
 from accounts.permissions import role_required
-from .forms import UserCreateForm, UserUpdateForm
+from .forms import ProfilePasswordChangeForm, UserCreateForm, UserUpdateForm
 from .models import CustomUser
 from sales.models import SalesInvoice
 from inventory.models import StockAuditLog
@@ -26,12 +26,19 @@ class ERPLogoutView(LogoutView):
 
 @login_required
 def profile_view(request):
+    pwd_form = ProfilePasswordChangeForm(request.POST or None, user=request.user)
+    if request.method == "POST" and pwd_form.is_valid():
+        request.user.set_password(pwd_form.cleaned_data["new_password"])
+        request.user.save(update_fields=["password"])
+        messages.success(request, "Password updated successfully. Please log in again.")
+        return redirect("logout")
+
     recent_invoices = SalesInvoice.objects.filter(cashier=request.user)[:10]
     recent_activity = StockAuditLog.objects.filter(user=request.user)[:10]
     return render(
         request,
         "accounts/profile.html",
-        {"recent_invoices": recent_invoices, "recent_activity": recent_activity},
+        {"recent_invoices": recent_invoices, "recent_activity": recent_activity, "pwd_form": pwd_form},
     )
 
 

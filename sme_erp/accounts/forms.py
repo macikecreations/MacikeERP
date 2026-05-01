@@ -1,4 +1,5 @@
 from django import forms
+from django.contrib.auth.password_validation import validate_password
 
 from .models import CustomUser
 
@@ -47,4 +48,32 @@ class UserUpdateForm(forms.ModelForm):
         if p1 or p2:
             if p1 != p2:
                 self.add_error("confirm_new_password", "New passwords do not match.")
+        return cleaned
+
+
+class ProfilePasswordChangeForm(forms.Form):
+    current_password = forms.CharField(widget=forms.PasswordInput, label="Current Password")
+    new_password = forms.CharField(widget=forms.PasswordInput, label="New Password")
+    confirm_new_password = forms.CharField(widget=forms.PasswordInput, label="Confirm New Password")
+
+    def __init__(self, *args, user=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.user = user
+        for field in self.fields.values():
+            field.widget.attrs["class"] = "form-control"
+
+    def clean_current_password(self):
+        current = self.cleaned_data.get("current_password", "")
+        if not self.user or not self.user.check_password(current):
+            raise forms.ValidationError("Current password is incorrect.")
+        return current
+
+    def clean(self):
+        cleaned = super().clean()
+        p1 = cleaned.get("new_password")
+        p2 = cleaned.get("confirm_new_password")
+        if p1 != p2:
+            self.add_error("confirm_new_password", "New passwords do not match.")
+        if p1:
+            validate_password(p1, user=self.user)
         return cleaned

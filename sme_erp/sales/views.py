@@ -769,6 +769,18 @@ def sales_report(request):
             "total"
         ],
     )
+    cost_expr = models.ExpressionWrapper(
+        models.F("quantity") * models.F("product__cost_price"),
+        output_field=models.DecimalField(max_digits=14, decimal_places=2),
+    )
+    cogs = money2(
+        SalesLineItem.objects.filter(invoice__status=SalesInvoice.Status.PAID).aggregate(total=models.Sum(cost_expr))["total"],
+    )
+    gross_profit = (money2(paid_invoices.aggregate(total=models.Sum("total_amount"))["total"]) - cogs).quantize(Decimal("0.01"))
+    gross_margin_pct = Decimal("0.00")
+    total_paid_sales = money2(paid_invoices.aggregate(total=models.Sum("total_amount"))["total"])
+    if total_paid_sales > 0:
+        gross_margin_pct = ((gross_profit / total_paid_sales) * Decimal("100")).quantize(Decimal("0.01"))
     payment_rows = paid_invoices.values("payment_method").annotate(
         total=models.Sum("total_amount"),
         count=models.Count("id"),
@@ -791,6 +803,8 @@ def sales_report(request):
             "daily_total": daily,
             "weekly_total": weekly,
             "monthly_total": monthly,
+            "gross_profit": gross_profit,
+            "gross_margin_pct": gross_margin_pct,
             "recent_invoices": recent,
             "payment_breakdown": payment_breakdown,
             "recent_mpesa_entries": recent_mpesa_entries,

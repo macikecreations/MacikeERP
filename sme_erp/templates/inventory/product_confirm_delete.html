@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card shadow-sm">
+    <div class="card-header"><h5 class="mb-0">Delete Product</h5></div>
+    <div class="card-body">
+        <p>Are you sure you want to delete <strong>{{ product.name }}</strong> (SKU: {{ product.sku }})?</p>
+        <p class="text-muted mb-4">If this product has sales history, deletion will be blocked to protect audit integrity.</p>
+        <form method="post" class="d-flex gap-2">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-danger">Yes, Delete</button>
+            <a class="btn btn-outline-secondary" href="/inventory/">Cancel</a>
+        </form>
+    </div>
+</div>
+{% endblock %}
