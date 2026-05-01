@@ -1,4 +1,5 @@
 import json
+import logging
 import re
 from datetime import timedelta
 from decimal import Decimal
@@ -26,7 +27,9 @@ from inventory.models import Product
 from inventory.services import consume_fifo_stock
 from .forms import CustomerForm, PaymentEntryForm, QuickSaleForm
 from .models import Customer, MpesaTransaction, PaymentEntry, SalesInvoice, SalesLineItem
-from .mpesa import MpesaAPIError, MpesaConfigError, initiate_stk_push
+from .mpesa import MpesaAPIError, MpesaConfigError, initiate_stk_push, normalize_msisdn_for_daraja
+
+logger = logging.getLogger(__name__)
 
 
 def _mark_invoice_failed(invoice_id: int | None) -> None:
@@ -37,17 +40,29 @@ def _mark_invoice_failed(invoice_id: int | None) -> None:
 
 def _reconcile_invoice_status_from_mpesa(invoice: SalesInvoice) -> SalesInvoice:
     """
-    Keep invoice status aligned with completed M-Pesa callbacks.
-
-    In rare edge cases (callback timing or transient errors), an invoice may stay
-    pending even though at least one linked M-Pesa transaction completed.
+    If Daraja marked an M-Pesa txn completed but stock finalization failed in the
+    callback (or the browser never got a refresh), retry FIFO finalize and PAID.
     """
     if invoice.payment_method != SalesInvoice.PaymentMethod.MPESA:
         return invoice
+    invoice.refresh_from_db(fields=["status"])
+    if invoice.status == SalesInvoice.Status.PAID:
+        return invoice
     has_completed_tx = invoice.mpesa_transactions.filter(status=MpesaTransaction.Status.COMPLETED).exists()
-    if has_completed_tx and invoice.status != SalesInvoice.Status.PAID:
-        SalesInvoice.objects.filter(pk=invoice.pk).update(status=SalesInvoice.Status.PAID)
+    if not has_completed_tx or invoice.status != SalesInvoice.Status.PENDING_PAYMENT:
+        return invoice
+    try:
+        with transaction.atomic():
+            locked = SalesInvoice.objects.select_for_update().get(pk=invoice.pk)
+            if locked.status != SalesInvoice.Status.PENDING_PAYMENT:
+                invoice.status = locked.status
+                return invoice
+            _finalize_invoice_stock(locked)
+            locked.status = SalesInvoice.Status.PAID
+            locked.save(update_fields=["status"])
         invoice.status = SalesInvoice.Status.PAID
+    except ValueError:
+        pass
     return invoice
 
 
@@ -175,9 +190,17 @@ def quick_sale(request):
             messages.error(request, "Insufficient stock quantity.")
             return redirect("sales-pos")
 
+        cust_phone = phone_number
+        if payment_method == SalesInvoice.PaymentMethod.MPESA:
+            try:
+                cust_phone = normalize_msisdn_for_daraja(phone_number)
+            except ValueError as exc:
+                messages.error(request, str(exc))
+                return redirect("sales-pos")
+
         customer_obj = _resolve_customer(
             name=customer_name,
-            phone=phone_number,
+            phone=cust_phone,
             address=customer_address,
             region=customer_region,
         )
@@ -209,7 +232,7 @@ def quick_sale(request):
                     invoice.recalculate_totals()
 
                 stk_response = initiate_stk_push(
-                    phone_number=phone_number,
+                    phone_number=cust_phone,
                     amount=int(invoice.total_amount),
                     account_reference=f"INV-{invoice.id}",
                     transaction_desc="Macike sale",
@@ -219,7 +242,7 @@ def quick_sale(request):
                         invoice=invoice,
                         checkout_request_id=stk_response.get("CheckoutRequestID"),
                         merchant_request_id=stk_response.get("MerchantRequestID"),
-                        phone_number=phone_number,
+                        phone_number=cust_phone,
                         amount=invoice.total_amount,
                         status=MpesaTransaction.Status.PENDING,
                         result_desc=stk_response.get("CustomerMessage", "STK initiated"),
@@ -244,7 +267,7 @@ def quick_sale(request):
 
             messages.success(
                 request,
-                f"STK push sent to {phone_number}. Approve on the handset; this page updates when Daraja calls back.",
+                f"STK push sent to {cust_phone}. Approve on the handset; this page updates when Daraja calls back.",
             )
             request.session["mpesa_watch_invoice_id"] = invoice.id
             # For M-Pesa, do not open receipt immediately; payment is asynchronous.
@@ -331,6 +354,7 @@ def mpesa_callback(request):
     try:
         payload = json.loads(request.body.decode("utf-8") or "{}")
     except json.JSONDecodeError:
+        logger.warning("mpesa_callback: invalid JSON body")
         return HttpResponse("Invalid JSON", status=400)
 
     stk = payload.get("Body", {}).get("stkCallback", {})
@@ -339,12 +363,20 @@ def mpesa_callback(request):
     result_desc = stk.get("ResultDesc", "")
 
     if not checkout_request_id:
+        logger.warning("mpesa_callback: missing CheckoutRequestID")
         return HttpResponse("Missing CheckoutRequestID", status=400)
 
     try:
         payment_ok = int(result_code) == 0
     except (TypeError, ValueError):
         payment_ok = False
+
+    logger.info(
+        "mpesa_callback checkout=%s result_code=%s ok=%s",
+        checkout_request_id,
+        result_code,
+        payment_ok,
+    )
 
     try:
         with transaction.atomic():
@@ -371,9 +403,18 @@ def mpesa_callback(request):
                 _sync_customer_mobile_from_mpesa(invoice=invoice, phone=cb_phone or mpesa_txn.phone_number)
 
                 if invoice.status == SalesInvoice.Status.PENDING_PAYMENT:
-                    _finalize_invoice_stock(invoice)
-                    invoice.status = SalesInvoice.Status.PAID
-                    invoice.save(update_fields=["status"])
+                    sid = transaction.savepoint()
+                    try:
+                        _finalize_invoice_stock(invoice)
+                        invoice.status = SalesInvoice.Status.PAID
+                        invoice.save(update_fields=["status"])
+                    except ValueError as exc:
+                        transaction.savepoint_rollback(sid)
+                        logger.warning(
+                            "M-Pesa COMPLETED but stock finalize failed for invoice %s: %s",
+                            invoice.id,
+                            exc,
+                        )
             else:
                 mpesa_txn.status = MpesaTransaction.Status.FAILED
                 mpesa_txn.save(update_fields=["status", "result_desc", "raw_callback"])
@@ -381,9 +422,8 @@ def mpesa_callback(request):
                     invoice.status = SalesInvoice.Status.FAILED
                     invoice.save(update_fields=["status"])
     except MpesaTransaction.DoesNotExist:
+        logger.warning("mpesa_callback: unknown checkout_request_id=%s", checkout_request_id)
         return HttpResponse("Unknown transaction", status=404)
-    except ValueError as exc:
-        return HttpResponse(f"Stock finalization failed: {exc}", status=409)
 
     return HttpResponse("OK", status=200)
 

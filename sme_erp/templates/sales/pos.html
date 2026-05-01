@@ -187,6 +187,7 @@
     if (!popupEl || !popupBodyEl) return;
 
     let lastState = "";
+    let lastTxState = "";
     let pollTimer = null;
     let hideTimer = null;
 
@@ -230,10 +231,16 @@
                 }
 
                 const state = String(data.invoice_status || "");
-                if (state === lastState) return;
+                const txState = String(data.transaction_status || "");
+                if (state === lastState && txState === lastTxState) return;
                 lastState = state;
+                lastTxState = txState;
 
-                if (state === "PENDING_PAYMENT") {
+                if (txState === "COMPLETED" && state === "PENDING_PAYMENT") {
+                    showStatus("M-Pesa confirmed on Safaricom. Finalizing stock and invoice…", "mpesa-status-pending");
+                    return;
+                }
+                if (state === "PENDING_PAYMENT" && txState === "PENDING") {
                     showStatus("M-Pesa request sent. Waiting for customer confirmation on phone.", "mpesa-status-pending");
                     return;
                 }

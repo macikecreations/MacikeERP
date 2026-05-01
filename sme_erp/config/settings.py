@@ -47,6 +47,12 @@ _base_allowed = [h.strip() for h in os.getenv("ALLOWED_HOSTS", "127.0.0.1,localh
 _always_allowed = ("macike.space", "10.128.0.2")
 ALLOWED_HOSTS = list(dict.fromkeys([*_base_allowed, *_always_allowed]))
 
+# HTTPS sites (e.g. after Certbot). Comma-separated full origins in .env, e.g.
+# CSRF_TRUSTED_ORIGINS=https://macike.space,https://www.macike.space
+CSRF_TRUSTED_ORIGINS = [
+    x.strip() for x in os.getenv("CSRF_TRUSTED_ORIGINS", "").split(",") if x.strip()
+]
+
 
 # Application definition
 
