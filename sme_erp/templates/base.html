@@ -131,6 +131,26 @@
             border-color: #334155;
             color: #e2e8f0;
         }
+        body.theme-dark .alert.alert-danger {
+            background-color: #4a1d1f;
+            border-color: #7f1d1d;
+            color: #fecaca;
+        }
+        body.theme-dark .alert.alert-warning {
+            background-color: #3b2a14;
+            border-color: #854d0e;
+            color: #fde68a;
+        }
+        body.theme-dark .alert.alert-success {
+            background-color: #123f2b;
+            border-color: #166534;
+            color: #bbf7d0;
+        }
+        body.theme-dark .alert.alert-info {
+            background-color: #172b4d;
+            border-color: #1d4ed8;
+            color: #bfdbfe;
+        }
         body.theme-dark .badge-soft-success {
             background: #123f2b;
             color: #86efac;
@@ -245,8 +265,40 @@
             color: #94a3b8 !important;
         }
         @media (max-width: 991px) {
-            .app-shell .sidebar-col { width: 78px; }
-            .app-shell .content-col { width: calc(100% - 78px); }
+            .app-shell .sidebar-col {
+                width: 64px;
+                min-width: 64px;
+                max-width: 64px;
+                padding: 0.5rem !important;
+                overflow-x: hidden;
+            }
+            .app-shell .content-col { width: calc(100% - 64px); }
+            .app-shell .content-col.p-4 { padding: 0.9rem !important; }
+            .sidebar-link {
+                justify-content: center;
+                gap: 0;
+                padding: 0.5rem;
+                min-height: 40px;
+            }
+            .sidebar-link i {
+                width: auto;
+                font-size: 1.05rem;
+            }
+            .sidebar-link .link-text,
+            .sidebar-caption,
+            .app-subtitle.sidebar-role,
+            .sidebar-control-btn .link-text { opacity: 0; width: 0; overflow: hidden; }
+            .sidebar-control-btn {
+                justify-content: center !important;
+                padding-left: 0.4rem;
+                padding-right: 0.4rem;
+            }
+            .sidebar-control-btn i { margin: 0; }
+            .sidebar-footer { gap: 0.4rem !important; }
+            .top-stat { font-size: 1.2rem; }
+            .section-title { font-size: 1.25rem; }
+            .table { font-size: 0.92rem; }
+            .navbar-brand span { font-size: 0.92rem; }
         }
     </style>
     {% block extra_head %}{% endblock %}
@@ -307,7 +359,15 @@
             <section class="col-12 p-4">
             {% endif %}
                 {% for message in messages %}
-                    <div class="alert alert-info shadow-sm" role="alert">{{ message }}</div>
+                    {% if "error" in message.tags %}
+                        <div class="alert alert-danger shadow-sm" role="alert">{{ message }}</div>
+                    {% elif "warning" in message.tags %}
+                        <div class="alert alert-warning shadow-sm" role="alert">{{ message }}</div>
+                    {% elif "success" in message.tags %}
+                        <div class="alert alert-success shadow-sm" role="alert">{{ message }}</div>
+                    {% else %}
+                        <div class="alert alert-info shadow-sm" role="alert">{{ message }}</div>
+                    {% endif %}
                 {% endfor %}
                 {% block content %}{% endblock %}
             </section>
