@@ -44,7 +44,14 @@ DEBUG = os.getenv("DEBUG", "True").lower() in ("1", "true", "yes", "on")
 
 # Comma-separated hostnames in ALLOWED_HOSTS (.env). Production domain and VPS IP are always merged in.
 _base_allowed = [h.strip() for h in os.getenv("ALLOWED_HOSTS", "127.0.0.1,localhost").split(",") if h.strip()]
-_always_allowed = ("macike.space", "10.128.0.2")
+# Include apex + www + raw IP. Some clients send Host as IP:443; Daraja callbacks use the URL host you configured.
+_always_allowed = (
+    "macike.space",
+    "www.macike.space",
+    "10.128.0.2",
+    "34.71.198.159",
+    "34.71.198.159:443",
+)
 ALLOWED_HOSTS = list(dict.fromkeys([*_base_allowed, *_always_allowed]))
 
 # HTTPS sites (e.g. after Certbot). Comma-separated full origins in .env, e.g.
