@@ -15,12 +15,13 @@
             {% if customer.region %}<span>{{ customer.region }}</span>{% endif %}
         </p>
     </div>
-    <div>
+    <div class="d-flex align-items-center gap-2 flex-wrap">
         {% if customer.is_active %}
             <span class="badge badge-soft-success">Active</span>
         {% else %}
             <span class="badge badge-soft-danger">Inactive</span>
         {% endif %}
+        <a class="btn btn-sm btn-primary" href="{% url 'sales-customer-edit' customer.pk %}">Edit details</a>
     </div>
 </div>
 

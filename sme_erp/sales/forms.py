@@ -154,3 +154,8 @@ class CustomerForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         for name, field in self.fields.items():
             field.widget.attrs["class"] = "form-check-input" if name == "is_active" else "form-control"
+        self.fields["mobile"].required = False
+        self.fields["mobile"].help_text = (
+            "Several customers can share one M-Pesa number; at checkout the system matches name and number together "
+            "so they are not merged into one profile."
+        )

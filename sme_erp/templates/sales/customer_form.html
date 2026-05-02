@@ -1,19 +1,26 @@
 {% extends "base.html" %}
 {% block content %}
 <div class="card shadow-sm">
-    <div class="card-header"><h5 class="mb-0">Add Customer</h5></div>
+    <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <h5 class="mb-0">{% if editing %}Edit customer{% else %}Add customer{% endif %}</h5>
+        {% if editing %}
+        <a class="btn btn-sm btn-outline-secondary" href="{% url 'sales-customer-detail' customer.pk %}">Back to profile</a>
+        {% endif %}
+    </div>
     <div class="card-body">
         <form method="post" class="row g-3">
             {% csrf_token %}
             {% for field in form %}
                 <div class="col-md-6">
-                    <label class="form-label">{{ field.label }}</label>
+                    <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
                     {{ field }}
+                    {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
                     {% if field.errors %}<div class="text-danger small">{{ field.errors|striptags }}</div>{% endif %}
                 </div>
             {% endfor %}
-            <div class="col-12">
-                <button class="btn btn-primary" type="submit">Save Customer</button>
+            <div class="col-12 d-flex flex-wrap gap-2">
+                <button class="btn btn-primary" type="submit">{% if editing %}Save changes{% else %}Save customer{% endif %}</button>
+                <a class="btn btn-outline-secondary" href="{% if editing %}{% url 'sales-customer-detail' customer.pk %}{% else %}{% url 'sales-customers' %}{% endif %}">Cancel</a>
             </div>
         </form>
     </div>

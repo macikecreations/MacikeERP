@@ -95,38 +95,60 @@ def _sync_customer_mobile_from_mpesa(*, invoice: SalesInvoice, phone: str) -> No
 
 
 def _resolve_customer(*, name: str, phone: str, address: str, region: str) -> Customer:
-    """Resolve customer with lower collision risk than name-only matching."""
+    """
+    Match checkout to an existing Customer without merging different people who share one M-Pesa line.
+
+    Order: (mobile + name) → unique mobile → (name + address + region) → name only → create.
+    Mobile alone is used only when exactly one customer has that number.
+    """
+    name = (name or "").strip()
+    phone = (phone or "").strip()
+    address = (address or "").strip()
+    region = (region or "").strip()
+
+    def _apply_field_updates(customer: Customer) -> Customer:
+        updates = {}
+        if phone and customer.mobile != phone:
+            updates["mobile"] = phone
+        if address and customer.address != address:
+            updates["address"] = address
+        if region and customer.region != region:
+            updates["region"] = region
+        if updates:
+            Customer.objects.filter(pk=customer.pk).update(**updates)
+            for key, value in updates.items():
+                setattr(customer, key, value)
+        return customer
+
     customer = None
-    if phone:
-        customer = Customer.objects.filter(mobile=phone).order_by("id").first()
-    if customer is None and (address or region):
+
+    if phone and name:
+        customer = Customer.objects.filter(mobile=phone, name__iexact=name).order_by("id").first()
+
+    if customer is None and phone:
+        mob_qs = Customer.objects.filter(mobile=phone).order_by("id")
+        if mob_qs.count() == 1:
+            customer = mob_qs.first()
+
+    if customer is None and name and (address or region):
         customer = Customer.objects.filter(
             name__iexact=name,
             address__iexact=address,
             region__iexact=region,
         ).order_by("id").first()
-    if customer is None:
+
+    if customer is None and name:
         customer = Customer.objects.filter(name__iexact=name).order_by("id").first()
+
     if customer is None:
         return Customer.objects.create(
-            name=name,
+            name=name or "Walk-in",
             mobile=phone or "",
             address=address,
             region=region,
         )
 
-    updates = {}
-    if phone and customer.mobile != phone:
-        updates["mobile"] = phone
-    if address and customer.address != address:
-        updates["address"] = address
-    if region and customer.region != region:
-        updates["region"] = region
-    if updates:
-        Customer.objects.filter(pk=customer.pk).update(**updates)
-        for key, value in updates.items():
-            setattr(customer, key, value)
-    return customer
+    return _apply_field_updates(customer)
 
 
 def _pos_page_context(form: QuickSaleForm, app_settings: AppSettings) -> dict:
@@ -555,7 +577,23 @@ def customer_create(request):
         form.save()
         messages.success(request, "Customer saved.")
         return redirect("sales-customers")
-    return render(request, "sales/customer_form.html", {"form": form})
+    return render(request, "sales/customer_form.html", {"form": form, "editing": False})
+
+
+@login_required
+@role_required("ADMIN", "MANAGER", "CASHIER")
+def customer_edit(request, customer_id: int):
+    customer = get_object_or_404(Customer, pk=customer_id)
+    form = CustomerForm(request.POST or None, instance=customer)
+    if request.method == "POST" and form.is_valid():
+        form.save()
+        messages.success(request, "Customer updated.")
+        return redirect("sales-customer-detail", customer_id=customer.id)
+    return render(
+        request,
+        "sales/customer_form.html",
+        {"form": form, "customer": customer, "editing": True},
+    )
 
 
 def _pdf_logo_bytes(logo_url: str) -> bytes | None:
