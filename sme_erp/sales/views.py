@@ -10,6 +10,7 @@ import requests
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db import models, transaction
+from django.db.models import Count, Q, Sum
 from django.http import FileResponse, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
@@ -514,8 +515,36 @@ def add_payment_entry(request, invoice_id: int):
 @login_required
 @role_required("ADMIN", "MANAGER", "CASHIER", "AUDITOR")
 def customer_list(request):
-    customers = Customer.objects.all().order_by("name")
+    customers = Customer.objects.annotate(invoice_count=Count("invoices")).order_by("name")
     return render(request, "sales/customer_list.html", {"customers": customers})
+
+
+@login_required
+@role_required("ADMIN", "MANAGER", "CASHIER", "AUDITOR")
+def customer_detail(request, customer_id: int):
+    customer = get_object_or_404(Customer, pk=customer_id)
+    invoices = (
+        customer.invoices.select_related("cashier")
+        .prefetch_related("mpesa_transactions", "payment_entries")
+        .order_by("-timestamp")
+    )
+    agg = customer.invoices.aggregate(
+        total_invoices=Count("id"),
+        paid_total=Sum("total_amount", filter=Q(status=SalesInvoice.Status.PAID)),
+        pending_count=Count("id", filter=Q(status=SalesInvoice.Status.PENDING_PAYMENT)),
+    )
+    paid_total = agg["paid_total"] or Decimal("0")
+    return render(
+        request,
+        "sales/customer_detail.html",
+        {
+            "customer": customer,
+            "invoices": invoices,
+            "total_invoices": agg["total_invoices"] or 0,
+            "paid_total": paid_total,
+            "pending_count": agg["pending_count"] or 0,
+        },
+    )
 
 
 @login_required

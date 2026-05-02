@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-4">
+    <div>
+        <nav aria-label="breadcrumb" class="mb-2">
+            <ol class="breadcrumb mb-0">
+                <li class="breadcrumb-item"><a href="{% url 'sales-customers' %}">Customers</a></li>
+                <li class="breadcrumb-item active" aria-current="page">{{ customer.name }}</li>
+            </ol>
+        </nav>
+        <h2 class="section-title mb-1">{{ customer.name }}</h2>
+        <p class="text-muted mb-0">
+            {% if customer.mobile %}<span class="me-3"><i class="bi bi-phone me-1"></i>{{ customer.mobile }}</span>{% endif %}
+            {% if customer.address %}<span class="me-3">{{ customer.address }}</span>{% endif %}
+            {% if customer.region %}<span>{{ customer.region }}</span>{% endif %}
+        </p>
+    </div>
+    <div>
+        {% if customer.is_active %}
+            <span class="badge badge-soft-success">Active</span>
+        {% else %}
+            <span class="badge badge-soft-danger">Inactive</span>
+        {% endif %}
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-4">
+        <div class="card shadow-sm h-100">
+            <div class="card-body">
+                <p class="app-subtitle mb-1 text-muted small text-uppercase">Linked sales</p>
+                <div class="fs-3 fw-semibold">{{ total_invoices }}</div>
+                <p class="text-muted small mb-0">Invoices where this customer record is attached.</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card shadow-sm h-100">
+            <div class="card-body">
+                <p class="app-subtitle mb-1 text-muted small text-uppercase">Paid total</p>
+                <div class="fs-3 fw-semibold">{{ app_settings.currency_code }} {{ paid_total|floatformat:2 }}</div>
+                <p class="text-muted small mb-0">Sum of invoices marked paid.</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card shadow-sm h-100">
+            <div class="card-body">
+                <p class="app-subtitle mb-1 text-muted small text-uppercase">Pending payment</p>
+                <div class="fs-3 fw-semibold">{{ pending_count }}</div>
+                <p class="text-muted small mb-0">Invoices still awaiting payment (e.g. M-Pesa).</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div>
+            <h5 class="mb-0">Sales &amp; payment activity</h5>
+            <p class="text-muted small mb-0 mt-1">Each row is an invoice; M-Pesa rows show gateway status for that sale.</p>
+        </div>
+        <a class="btn btn-sm btn-primary" href="{% url 'sales-pos' %}">New sale</a>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover mb-0 align-middle">
+            <thead class="table-dark">
+                <tr>
+                    <th>When</th>
+                    <th>Invoice</th>
+                    <th>Status</th>
+                    <th>Payment</th>
+                    <th class="text-end">Amount</th>
+                    <th>M-Pesa / notes</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for inv in invoices %}
+                <tr>
+                    <td class="text-nowrap">{{ inv.timestamp }}</td>
+                    <td><strong>INV-{{ inv.id }}</strong><br><span class="text-muted small">{{ inv.cashier.username }}</span></td>
+                    <td><span class="badge bg-secondary">{{ inv.get_status_display }}</span></td>
+                    <td>{{ inv.get_payment_method_display }}</td>
+                    <td class="text-end">{{ app_settings.currency_code }} {{ inv.total_amount|floatformat:2 }}</td>
+                    <td class="small">
+                        {% if inv.payment_method == "MPESA" %}
+                            {% for tx in inv.mpesa_transactions.all %}
+                                <div><span class="badge {% if tx.status == 'COMPLETED' %}text-bg-success{% elif tx.status == 'FAILED' %}text-bg-danger{% else %}text-bg-warning text-dark{% endif %}">{{ tx.get_status_display }}</span>
+                                    {% if tx.mpesa_code %} <span class="text-muted">{{ tx.mpesa_code }}</span>{% endif %}
+                                </div>
+                            {% empty %}
+                                <span class="text-muted">—</span>
+                            {% endfor %}
+                        {% else %}
+                            {% if inv.payment_entries.exists %}
+                                <span class="text-muted">Posted payments ({{ inv.payment_entries.count }})</span>
+                            {% else %}
+                                <span class="text-muted">—</span>
+                            {% endif %}
+                        {% endif %}
+                    </td>
+                    <td class="text-nowrap">
+                        <a class="btn btn-sm btn-outline-primary" href="{% url 'sales-receipt' inv.id %}">Receipt</a>
+                    </td>
+                </tr>
+            {% empty %}
+                <tr>
+                    <td colspan="7" class="text-center text-muted py-5">
+                        No invoices linked to this customer yet. Sales created at checkout attach the resolved customer record when name/phone match.
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

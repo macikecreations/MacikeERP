@@ -3,6 +3,7 @@ from django.urls import path
 from .views import (
     add_payment_entry,
     customer_create,
+    customer_detail,
     customer_list,
     mpesa_callback,
     mpesa_status,
@@ -16,6 +17,7 @@ urlpatterns = [
     path("pos/", quick_sale, name="sales-pos"),
     path("customers/", customer_list, name="sales-customers"),
     path("customers/new/", customer_create, name="sales-customer-create"),
+    path("customers/<int:customer_id>/", customer_detail, name="sales-customer-detail"),
     path("receipt/<int:invoice_id>/", receipt_view, name="sales-receipt"),
     path("receipt/<int:invoice_id>/payments/new/", add_payment_entry, name="sales-add-payment-entry"),
     path("receipt/<int:invoice_id>/pdf/", receipt_pdf, name="sales-receipt-pdf"),
