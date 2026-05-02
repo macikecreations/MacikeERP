@@ -22,7 +22,7 @@
                     <td>{{ c.region|default:"-" }}</td>
                     <td class="text-end">{{ c.invoice_count }}</td>
                     <td>{% if c.is_active %}<span class="badge badge-soft-success">Active</span>{% else %}<span class="badge badge-soft-danger">Inactive</span>{% endif %}</td>
-                    <td class="d-print-none"><a class="btn btn-sm btn-outline-primary" href="{% url 'sales-customer-edit' c.pk %}" title="Edit">Edit</a></td>
+                    <td class="d-print-none"><a class="btn btn-sm btn-outline-primary" href="/sales/customers/{{ c.pk }}/edit/" title="Edit">Edit</a></td>
                 </tr>
             {% empty %}
                 <tr><td colspan="7" class="text-center">No customers yet.</td></tr>

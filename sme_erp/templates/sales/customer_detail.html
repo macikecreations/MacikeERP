@@ -21,7 +21,7 @@
         {% else %}
             <span class="badge badge-soft-danger">Inactive</span>
         {% endif %}
-        <a class="btn btn-sm btn-primary" href="{% url 'sales-customer-edit' customer.pk %}">Edit details</a>
+        <a class="btn btn-sm btn-primary" href="/sales/customers/{{ customer.pk }}/edit/">Edit details</a>
     </div>
 </div>
 
